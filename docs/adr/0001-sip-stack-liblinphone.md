@@ -1,6 +1,6 @@
 # ADR-0001: SIP stack is liblinphone (linphone-sdk 5.5.x) over SIP/TLS + SRTP; CallKit owned by the app, PushKit by the SDK
 
-- **Status:** proposed
+- **Status:** accepted (owner, 2026-09-14)
 - **Date:** 2026-09-14
 - **Deciders:** Hugo (owner)
 

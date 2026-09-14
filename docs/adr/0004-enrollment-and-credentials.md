@@ -1,6 +1,6 @@
 # ADR-0004: Devices enroll with a single-use code from the admin UI; MVP shares the user's SIP secret (ha1) across devices, per-device credentials in v1
 
-- **Status:** proposed
+- **Status:** accepted (owner, 2026-09-14)
 - **Date:** 2026-09-14
 - **Deciders:** Hugo (owner)
 

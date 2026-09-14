@@ -1,6 +1,6 @@
 # ADR-0002: Push wake-up parks the INVITE in Kamailio; push tokens live in `platform.devices`; dead TCP contacts are never relayed to
 
-- **Status:** proposed (implementation belongs to `voice-platform`; this ADR records what the app relies on)
+- **Status:** accepted (owner, 2026-09-14)
 - **Date:** 2026-09-14
 - **Deciders:** Hugo (owner)
 

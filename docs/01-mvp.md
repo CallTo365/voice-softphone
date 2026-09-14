@@ -1,6 +1,6 @@
 # Softphone MVP: scope, architecture, plan
 
-Status: **proposed 2026-09-14, not approved, no app code yet.** Decisions to take are in section 9.
+Status: **decisions D1-D10 approved by the owner on 2026-09-14** (section 9). Phase 0 in progress.
 
 ## 1. Goal
 
@@ -140,9 +140,9 @@ in `voice-platform` (see `docs/03-platform-changes.md`).
 | P6 | Kamailio `gruu_enabled=1`; control plane `POST /v1/calls/{id}/move {device_id}` (park + originate to GRUU + bridge), `X-CallTo-Move` header, cancel push on move | 4 |
 | P7 | User-scoped CDR list for recents (`GET /v1/me/calls` or a filter on the tenant list) if not already covered by the OIDC `user` role | 5 |
 
-## 9. Decisions to take (owner)
+## 9. Decisions (all recommendations approved by the owner, 2026-09-14)
 
-| Id | Question | Recommendation |
+| Id | Question | Decision |
 |---|---|---|
 | D1 | SIP stack | **liblinphone 5.5.21** (ADR-0001). PJSIP only if we want to avoid AGPL and accept building CallKit/PushKit/audio glue ourselves |
 | D2 | Names | Repo `voice-softphone` (this), app name "CallTo", bundle id `com.callto365.softphone`, GitHub `CallTo365/voice-softphone` **public** (open source at first). Licence file GPL-3.0 |
@@ -150,10 +150,10 @@ in `voice-platform` (see `docs/03-platform-changes.md`).
 | D4 | Credential model (ADR-0004) | MVP: one SIP identity per user, the enrolled device receives the user's `ha1` + realm (the platform stores no plaintext); revocation = rotate the user's SIP secret and re-provision remaining devices. v1: per-device subscriber rows as `07-clients.md` section 4 already plans |
 | D5 | Enrollment (ADR-0004) | Enrollment code / QR generated in the admin UI user sheet (10-minute validity, single use) for the MVP; Entra sign-in in phase 5 once a public-client app registration exists |
 | D6 | Call continuation (ADR-0003) | `POST /v1/calls/{id}/move {device_id}` built on park/retrieve with GRUU targeting; both "Move to ..." (from the active device) and "Continue here" (from the other device, same endpoint, target = self) |
-| D7 | What "two softphones" means | Two installed apps (or app + Bria/desk phone) on one user, all ringing together, first answer wins. If it means two SIP accounts in one app (e.g. two tenants), say so: liblinphone supports it but the UI and enrollment change |
+| D7 | What "two softphones" means | **Two devices, one user** (owner, 2026-09-14): two installed apps (or app + Bria/desk phone) on one user, all ringing together, first answer wins |
 | D8 | Push payload (S8) | Minimal: `aps.call-id` (SIP Call-ID), platform `call_id`, `callee`, `tenant`; caller number/name **not** in the push, taken from the INVITE (arrives < 2 s later) and shown via `CXCallUpdate`. Faster first paint if we include the caller number; that sends PII to Apple |
 | D9 | Codecs | Opus (preferred) + PCMA, 20 ms, DTX on; FreeSWITCH transcodes toward PSTN as today. Confirm opus is enabled on the worker profile |
-| D10 | Test VM exposure | Open 5061/tcp + RTP to the internet on `voice-mvp-fw` for mobile-network tests (P2), or test on office Wi-Fi only until a staging edge exists |
+| D10 | Test VM exposure | Open 5061/tcp + RTP to the internet on `voice-mvp-fw` for mobile-network tests (P2) |
 
 ## 10. Risks and how the plan handles them
 

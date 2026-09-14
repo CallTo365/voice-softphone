@@ -1,6 +1,6 @@
 # ADR-0003: Continue a call on another device = control-plane "move" to a specific device via GRUU
 
-- **Status:** proposed
+- **Status:** accepted (owner, 2026-09-14)
 - **Date:** 2026-09-14
 - **Deciders:** Hugo (owner)
 
