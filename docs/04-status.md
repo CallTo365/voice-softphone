@@ -1,16 +1,21 @@
 # Status and hand-off
 
-## 2026-09-14
-- Repo created with the agent instruction layout (`CLAUDE.md`, `.ai/*`, hooks), design docs 01-03 and
-  ADR-0001..0004 (all **proposed**). No app code, no Xcode project yet.
-- Decisions D1-D10 in `docs/01-mvp.md` section 9 are waiting for the owner.
-- Platform work P1-P7 is listed in `docs/03-platform-changes.md`; nothing started in `voice-platform`.
-- Local toolchain checked: Xcode 26.6, Swift 6.3, xcodegen present. linphone-sdk stable 5.5.21
-  (5.6.0-alpha exists; do not use).
-- Not yet: GitHub remote, LICENSE file (D2), Apple developer prerequisites (01 section 7).
+## 2026-09-14 (evening) — decisions approved, phase 0 built
+- All D1-D10 approved by the owner; D7 = two devices, one user. ADR-0001..0004 accepted. LICENSE
+  GPL-3.0. Public repo `https://github.com/CallTo365/voice-softphone`.
+- Phase 0 code: `project.yml` (xcodegen), `packages/SoftphoneKit` (CallEngine on linphone-sdk
+  5.5.21-novideo via the GitHub mirror, AccountStore/Keychain, DialString, Redactor, Diagnostics),
+  SwiftUI app (dev account screen, dialer, call screen), 17 unit tests.
+- Verified: `make build` (Swift 6 strict concurrency) and `make test` (17/17 on iPhone 15 simulator,
+  Core starts, instance id persisted). In the simulator against the VM: with certificate verification on
+  the TLS handshake fails on the self-signed 5061 cert (expected, P1); with the development trust toggle
+  the REGISTER reaches Kamailio and a wrong password is answered "Unauthorized". A real registration and
+  the phase 0 exit call need the seeded `SIP_USER_PASSWORD` (VM `.env`) typed into the dev screen.
+- Not yet: Apple team / signing (device builds), P1 cert on the VM, P2 firewall.
 
 ## Open threads
-- D7: confirm what "two softphones" means for the owner.
-- D10: VM firewall exposure for mobile-network tests.
+- Phase 0 exit criterion (two-way audio 1001 <-> 1002 and PSTN) still to run by the owner with the real
+  password once P1 is deployed (or with the trust toggle before that).
 - Kamailio dead-branch handling (P3): `remove_branch` vs `event_route[tcp:closed]` + `ul.rm`, to be
   decided in the platform build pass with a SIPp/real-phone test.
+- Password field: phase 3 replaces it with enrollment; until then the dev screen is the only way in.

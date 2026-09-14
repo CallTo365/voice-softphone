@@ -1,0 +1,7 @@
+// Signing defaults for every target. Put your Apple Team ID in configs/Signing.local.xcconfig
+// (git-ignored):   SOFTPHONE_TEAM_ID = ABCDE12345
+// Simulator builds need no team; device builds and push entitlements do.
+SOFTPHONE_TEAM_ID =
+#include? "Signing.local.xcconfig"
+DEVELOPMENT_TEAM = $(SOFTPHONE_TEAM_ID)
+CODE_SIGN_STYLE = Automatic

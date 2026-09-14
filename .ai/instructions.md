@@ -1,24 +1,27 @@
 # Working instructions
 
-## Where things are (planned layout; created in phase 0)
+## Where things are
 | Path | What |
 |---|---|
 | `docs/` | Normative design: `01-mvp.md` (scope, architecture, phases, decisions), `02-call-flows.md`, `03-platform-changes.md` (what `voice-platform` must gain), `04-status.md` (hand-off) |
 | `docs/adr/` | Architecture decision records, one file per decision |
 | `.ai/` | This folder: instructions, guardrails, mistakes log |
-| `project.yml` | xcodegen spec; the `.xcodeproj` is generated and git-ignored |
-| `apps/ios/Softphone/` | The iOS app (SwiftUI): screens, CallKit provider delegate, app lifecycle |
-| `packages/SoftphoneKit/` | Swift package, no UI: `CallEngine` (liblinphone wrapper), `PlatformAPI` (control plane REST + live-state WS), `AccountStore` (Keychain), `Diagnostics` |
-| `scripts/` | Bootstrap, device run, log collection |
+| `project.yml` | xcodegen spec; the `.xcodeproj` and `apps/ios/Softphone/Info.plist` are generated and git-ignored |
+| `apps/ios/Softphone/` | The iOS app (SwiftUI): screens, CallKit provider delegate (phase 1), app lifecycle |
+| `apps/ios/SoftphoneTests/` | Unit tests (Swift Testing) for SoftphoneKit logic; run on a simulator |
+| `packages/SoftphoneKit/` | Swift package, no UI: `CallEngine` (liblinphone wrapper), `AccountStore` (Keychain), `DialString`, `Redactor`, `Diagnostics`; `PlatformAPI` arrives in phase 3 |
+| `configs/` | `Signing.xcconfig` (committed) includes the git-ignored `Signing.local.xcconfig` with your Team ID |
 | `../voice-platform` | The PBX. Contracts in `docs/02-contracts.md`; Kamailio in `edge/kamailio`; control plane in `services/control-plane` |
 
-## Commands (once phase 0 exists)
+## Commands
 ```bash
-make bootstrap   # xcodegen generate; resolves SPM (linphone-sdk-swift-ios)
-make build       # xcodebuild -scheme Softphone -destination 'generic/platform=iOS Simulator' build
-make test        # swift test --package-path packages/SoftphoneKit + xcodebuild test for the app target
-make device      # build + install on the connected iPhone (xcrun devicectl), stream os_log
+make bootstrap   # xcodegen generate (Softphone.xcodeproj is git-ignored); first build resolves SPM
+make build       # compile for the simulator, unsigned
+make test        # SoftphoneTests on the simulator named in SIM (default "iPhone 15"), ad-hoc signed
+make device      # build for a connected iPhone; needs configs/Signing.local.xcconfig with SOFTPHONE_TEAM_ID
 ```
+Logs from a simulator run: `xcrun simctl spawn <udid> log show --last 2m --info --predicate
+'subsystem == "com.callto365.softphone"' --style compact`.
 Toolchain on the owner's Mac (2026-09-14): Xcode 26.6, Swift 6.3, xcodegen installed.
 
 ## Conventions
