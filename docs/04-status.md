@@ -25,9 +25,16 @@
   classifier refused that edit).
 - Not yet: Apple team / signing (device builds), P3-P7.
 
+- **22:34 CEST: first calls from the app.** 1001 registered with the real password over verified TLS
+  (after a 5-minute `ipban` I had caused with wrong-password tests, R8). Outbound to the echo agent
+  (+31856662751 via MOR): 407 -> authenticated INVITE -> 200 OK in 300 ms, SRTP (AES_CM_128_HMAC_SHA1_80),
+  opus offered, RTCP SRs from the far end for 27 s until the app's BYE. An inbound INVITE to 1001 reached
+  the app and rang (180). Two crashes at call start before that: the wrapper's unretained `LoggingService`
+  pointer (R9), fixed in the commit after 76cb8a6.
+
 ## Open threads
-- Phase 0 exit criterion (two-way audio 1001 <-> 1002 and PSTN) still to run by the owner with the real
-  password once P1 is deployed (or with the trust toggle before that).
+- Phase 0 exit criterion: signalling, SRTP and RTP/RTCP flow are proven; the owner confirms audible
+  two-way audio (echo heard from the simulator's Mac microphone) and a 1001 <-> 1002 call with Bria.
 - Kamailio dead-branch handling (P3): `remove_branch` vs `event_route[tcp:closed]` + `ul.rm`, to be
   decided in the platform build pass with a SIPp/real-phone test.
 - Password field: phase 3 replaces it with enrollment; until then the dev screen is the only way in.

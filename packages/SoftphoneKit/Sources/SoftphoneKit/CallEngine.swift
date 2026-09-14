@@ -27,6 +27,10 @@ public final class CallEngine {
     @ObservationIgnored private var core: Core?
     @ObservationIgnored private var coreDelegate: CoreDelegateStub?
     @ObservationIgnored private var logDelegate: LoggingServiceDelegateStub?
+    /// Must outlive every log callback: the wrapper stores an *unretained* pointer to this Swift object
+    /// in the C logging service ("swiftRef") and re-derives it on every log line, from any thread.
+    /// Letting it go out of scope crashed the app at call start (mediastreamer ticker thread, 2026-09-14).
+    @ObservationIgnored private var sdkLogging: LoggingService?
     @ObservationIgnored private var sdkAccount: Account?
     @ObservationIgnored private var sdkCall: Call?
     @ObservationIgnored private var speakerDevice: AudioDevice?
@@ -398,6 +402,7 @@ public final class CallEngine {
         })
         service.addDelegate(delegate: delegate)
         logDelegate = delegate
+        sdkLogging = service
     }
 
     /// Builds before 2026-09-14 wrote `<configDir>/linphonerc` with credentials inside; delete it once.

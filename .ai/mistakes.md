@@ -27,6 +27,9 @@ The **Log** is append-only.
   silently (the client sees 408), and the office IP is shared with the owner's own tests. Unban early with
   `kamcmd htable.delete ipban <ip>` on the VM. The app now stops registering after the first
   Unauthorized/Forbidden.
+- R9. Any linphonesw object whose C counterpart calls back into Swift (Core, LoggingService, Account,
+  Call with delegates) must be held in a stored property for as long as callbacks can arrive: the
+  wrapper stores unretained Swift pointers in the C objects and callbacks may come from any thread.
 - R7. The liblinphone Core is created with `configPath: nil`. A config file persists accounts, auth info
   (password/ha1) and `verify_server_certs` in plain text and restores them at the next launch; the
   Keychain is the only credential store and `start()` re-applies everything.
@@ -96,3 +99,15 @@ Template (copy, fill, append at the end):
   of the app.
 - **Fix:** `CallEngine` disables registration after the first Unauthorized/Forbidden; rule R8.
 - **Rule:** R8.
+
+### 2026-09-14 — app crashed at call start: freed LoggingService wrapper dereferenced from the media thread
+- **What happened:** two SIGABRTs seconds after placing a call (`LoggingService.__deallocating_deinit`
+  via `LoggingServiceDelegateManager` closure #2, called from mediastreamer2 `ms_ticker_run`).
+- **Root cause:** `LinphoneWrapper.swift` keeps only an *unretained* pointer to the Swift
+  `LoggingService` object in the C object's `swiftRef` user data; `installSDKLogging()` held
+  `LoggingService.Instance` in a local, so the Swift object was freed after setup and the next log line
+  from a non-main thread (the ticker starting at call time) used a dangling pointer.
+- **Impact:** every call crashed the app; registration alone worked, which hid it.
+- **Fix:** `CallEngine.sdkLogging` keeps the wrapper alive for the engine's lifetime (as the Linphone
+  app does). Rule R9.
+- **Rule:** R9.
