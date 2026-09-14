@@ -11,12 +11,15 @@
   the TLS handshake fails on the self-signed 5061 cert (expected, P1); with the development trust toggle
   the REGISTER reaches Kamailio and a wrong password is answered "Unauthorized". A real registration and
   the phase 0 exit call need the seeded `SIP_USER_PASSWORD` (VM `.env`) typed into the dev screen.
-- P1 built in `voice-platform` on branch `softphone/p1-sip-tls-cert` (a828104: `TLS_CERT_HOST` copies
-  Caddy's Let's Encrypt cert into Kamailio, `tls.reload` watcher; verified with bash -n, a fake Caddy
-  layout, `docker compose config`). Not merged or deployed: the main checkout had another session's
-  uncommitted Kamailio edits, so the owner merges + deploys (`docker compose up -d --build
-  --force-recreate kamailio`) and checks `openssl s_client -connect 91.99.163.145:5061 -servername
-  91-99-163-145.sslip.io`.
+- P1 built in `voice-platform` on branch `softphone/p1-sip-tls-cert` (a828104) and **deployed to the VM
+  by the owner from the branch on 2026-09-14 ~20:05Z** (main was dirty with another session's edits, so
+  `git archive softphone/p1-sip-tls-cert docker-compose.yml edge/kamailio` was exported; branch still to
+  merge). Kamailio logged the certificate install (expires 2026-12-11), `openssl s_client` shows issuer
+  Let's Encrypt, and the app on the simulator completed a TLS 1.3 handshake with certificate verification
+  on (no bypass) before Kamailio answered the wrong test password with Unauthorized.
+- Fixed the same evening: the Core is created with `configPath: nil` (liblinphone had persisted the
+  account, auth info and the trust flag in `linphonerc`; R7), and simulator builds are signed so the
+  Keychain works (R6).
 - P2 applied live on `voice-mvp-fw` (5061/tcp and 30000-30100/udp from anywhere); the same two
   `hcloud firewall add-rule` lines still need to go into `scripts/hetzner-up.sh` (the auto-mode
   classifier refused that edit).

@@ -19,8 +19,12 @@ The **Log** is append-only.
 - R5. The linphone-sdk Swift package is fetched from the GitHub mirror
   (`BelledonneCommunications/linphone-sdk-swift-ios`); gitlab.linphone.org drops connections. Binaries
   still come from download.linphone.org, so a build needs that host reachable.
-- R6. Simulator test runs are signed (ad hoc, no team needed); `CODE_SIGNING_ALLOWED=NO` is only for
-  `generic/platform=iOS Simulator` compile checks, because an unsigned app cannot use the Keychain.
+- R6. Every simulator build is signed (ad hoc, no team needed): an unsigned app cannot use the Keychain,
+  and the app then silently behaves differently (fresh instance id, no stored account). Never pass
+  `CODE_SIGNING_ALLOWED=NO`.
+- R7. The liblinphone Core is created with `configPath: nil`. A config file persists accounts, auth info
+  (password/ha1) and `verify_server_certs` in plain text and restores them at the next launch; the
+  Keychain is the only credential store and `start()` re-applies everything.
 
 ## Log
 
@@ -62,3 +66,15 @@ Template (copy, fill, append at the end):
 - **Fix:** Keychain load moved to its own `do/catch` with a warning; `make test` signs normally (simulator
   ad-hoc signing needs no team).
 - **Rule:** R6.
+
+### 2026-09-14 — liblinphone restored credentials and the trust flag from linphonerc
+- **What happened:** after "Sign out" and a relaunch, the app registered by itself before the new account
+  was entered, with `verify_server_certs=0` still in effect although the toggle was off; the container's
+  `linphonerc` held the account, the auth info and both verify flags.
+- **Root cause:** `createCore(configPath: "<dir>/linphonerc")` copied from Belledonne's tutorial; the SDK
+  persists everything it is told into that file. Not caught earlier because the first runs were on a
+  fresh container.
+- **Impact:** credentials in a plain file (S6), and a development-only TLS bypass surviving sign-out (S5).
+- **Fix:** `configPath: nil` (documented as "Core will not store any settings"), legacy file deleted at
+  start, `make build` signs so the Keychain is the store that actually works.
+- **Rule:** R6 amended, R7 new.

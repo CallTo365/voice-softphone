@@ -44,12 +44,11 @@ public final class CallEngine {
         do {
             installSDKLogging()
             let factory = Factory.Instance
-            let configDir = factory.getConfigDir(context: nil)
-            let core = try factory.createCore(
-                configPath: "\(configDir)/linphonerc",
-                factoryConfigPath: nil,
-                systemContext: nil
-            )
+            // No config file (S6): with a path, liblinphone persists accounts, auth info (password/ha1)
+            // and flags such as verify_server_certs in plain text and restores them on the next launch
+            // (seen 2026-09-14). The Keychain is the only store; everything is re-applied at start.
+            let core = try factory.createCore(configPath: nil, factoryConfigPath: nil, systemContext: nil)
+            Self.removeLegacyConfigFile(factory)
             self.core = core
             sdkVersion = Core.getVersion
 
@@ -384,6 +383,15 @@ public final class CallEngine {
         })
         service.addDelegate(delegate: delegate)
         logDelegate = delegate
+    }
+
+    /// Builds before 2026-09-14 wrote `<configDir>/linphonerc` with credentials inside; delete it once.
+    private static func removeLegacyConfigFile(_ factory: Factory) {
+        let path = factory.getConfigDir(context: nil) + "/linphonerc"
+        if FileManager.default.fileExists(atPath: path) {
+            try? FileManager.default.removeItem(atPath: path)
+            Diagnostics.sip.notice("removed legacy linphonerc")
+        }
     }
 
     private static func sdkTransport(_ t: SIPAccount.Transport) -> TransportType {

@@ -8,9 +8,9 @@ DEST = platform=iOS Simulator,name=$(SIM)
 bootstrap:            ## generate the Xcode project from project.yml (resolves SPM on first build)
 	xcodegen generate
 
-build: bootstrap      ## compile the app for the simulator (no signing needed)
+build: bootstrap      ## compile the app for the simulator (ad-hoc signed so the Keychain works, no team needed)
 	xcodebuild -project $(PROJECT) -scheme $(SCHEME) -destination 'generic/platform=iOS Simulator' \
-	  -configuration Debug CODE_SIGNING_ALLOWED=NO build | tail -n 40
+	  -configuration Debug build | tail -n 40
 
 test: bootstrap       ## unit tests (SoftphoneTests) on a simulator
 	xcodebuild -project $(PROJECT) -scheme $(SCHEME) -destination '$(DEST)' \
