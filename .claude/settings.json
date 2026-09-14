@@ -1,0 +1,24 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "awk '/^## Active rules/{f=1} /^## Log/{f=0} f' \"$CLAUDE_PROJECT_DIR/.ai/mistakes.md\" | sed 's/^/[mistakes.md] /'"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && if git rev-parse --is-inside-work-tree >/dev/null 2>&1 && ! git diff --quiet -- .ai/mistakes.md 2>/dev/null; then echo '[mistakes.md] updated this session (ok)'; else echo '[mistakes.md] not updated this session. If the user corrected you or a verification failed, append an entry now.'; fi"
+          }
+        ]
+      }
+    ]
+  }
+}
