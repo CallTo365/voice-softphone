@@ -21,7 +21,7 @@ working tree on 2026-09-14.
 | `gruu_enabled` | `modparam("registrar","gruu_enabled",0)` | must become 1 for P6 |
 | usrloc `db_mode` | 3 (DB-only) | `handle_lost_tcp` is documented as not working in DB-only mode, hence the `tcpops` approach below |
 
-## P1. Trusted certificate on 5061 (phase 0)
+## P1. Trusted certificate on 5061 (phase 0) — built 2026-09-14, branch `softphone/p1-sip-tls-cert` (a828104), not yet merged/deployed
 
 iOS/liblinphone verify the server certificate (S5). Caddy on the VM already holds a Let's Encrypt
 certificate for `91-99-163-145.sslip.io`. Mount it into Kamailio:
@@ -33,7 +33,7 @@ certificate for `91-99-163-145.sslip.io`. Mount it into Kamailio:
   SIP domain in From/To stays `acme.sip.local`, which is what `is_domain_local()` and `auth_check()`
   key on, so no cfg change. Production: `sip.<base-domain>` with the same mechanism (cert-manager in K8s).
 
-## P2. Firewall for mobile networks (phase 0, decision D10)
+## P2. Firewall for mobile networks (phase 0, decision D10) — applied to `voice-mvp-fw` 2026-09-14 (5061/tcp + 30000-30100/udp from 0.0.0.0/0, ::/0); `scripts/hetzner-up.sh` still to gain the same two rules
 
 `voice-mvp-fw` allows SIP/RTP only from the office IP and the trunk. A phone on 4G/5G cannot reach
 5061. Options: open `5061/tcp` and `30000-30100/udp` to `0.0.0.0/0` (Kamailio auth + `pike` + fail2ban

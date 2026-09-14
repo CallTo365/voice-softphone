@@ -11,7 +11,16 @@
   the TLS handshake fails on the self-signed 5061 cert (expected, P1); with the development trust toggle
   the REGISTER reaches Kamailio and a wrong password is answered "Unauthorized". A real registration and
   the phase 0 exit call need the seeded `SIP_USER_PASSWORD` (VM `.env`) typed into the dev screen.
-- Not yet: Apple team / signing (device builds), P1 cert on the VM, P2 firewall.
+- P1 built in `voice-platform` on branch `softphone/p1-sip-tls-cert` (a828104: `TLS_CERT_HOST` copies
+  Caddy's Let's Encrypt cert into Kamailio, `tls.reload` watcher; verified with bash -n, a fake Caddy
+  layout, `docker compose config`). Not merged or deployed: the main checkout had another session's
+  uncommitted Kamailio edits, so the owner merges + deploys (`docker compose up -d --build
+  --force-recreate kamailio`) and checks `openssl s_client -connect 91.99.163.145:5061 -servername
+  91-99-163-145.sslip.io`.
+- P2 applied live on `voice-mvp-fw` (5061/tcp and 30000-30100/udp from anywhere); the same two
+  `hcloud firewall add-rule` lines still need to go into `scripts/hetzner-up.sh` (the auto-mode
+  classifier refused that edit).
+- Not yet: Apple team / signing (device builds), P3-P7.
 
 ## Open threads
 - Phase 0 exit criterion (two-way audio 1001 <-> 1002 and PSTN) still to run by the owner with the real
