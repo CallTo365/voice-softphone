@@ -22,6 +22,11 @@ The **Log** is append-only.
 - R6. Every simulator build is signed (ad hoc, no team needed): an unsigned app cannot use the Keychain,
   and the app then silently behaves differently (fresh instance id, no stored account). Never pass
   `CODE_SIGNING_ALLOWED=NO`.
+- R8. Never test wrong credentials against the VM more than once: liblinphone retries a rejected digest
+  every few seconds, Kamailio bans the source IP after 10 failures for 5 minutes and drops everything
+  silently (the client sees 408), and the office IP is shared with the owner's own tests. Unban early with
+  `kamcmd htable.delete ipban <ip>` on the VM. The app now stops registering after the first
+  Unauthorized/Forbidden.
 - R7. The liblinphone Core is created with `configPath: nil`. A config file persists accounts, auth info
   (password/ha1) and `verify_server_certs` in plain text and restores them at the next launch; the
   Keychain is the only credential store and `start()` re-applies everything.
@@ -78,3 +83,16 @@ Template (copy, fill, append at the end):
 - **Fix:** `configPath: nil` (documented as "Core will not store any settings"), legacy file deleted at
   start, `make build` signs so the Keychain is the store that actually works.
 - **Rule:** R6 amended, R7 new.
+
+### 2026-09-14 — wrong-password tests banned the office IP on the edge; the owner's real registration got 408
+- **What happened:** three "wrong password" registration tests from the simulator (to prove the TLS path)
+  were enough for Kamailio's `route[AUTH_FAIL]` (10 failed authentications in 5 minutes -> `ipban` 5 min,
+  requests dropped without reply). The owner's first attempt with the real password fell in that window
+  and timed out (408).
+- **Root cause:** I treated one wrong-password attempt as one failure; liblinphone retries the same
+  credentials repeatedly ("Authentication is failing constantly, will retry later"), so one attempt is
+  several failures, and I did not read the edge's ban rules before testing.
+- **Impact:** ~5 minutes of no service for every phone behind the office IP; a misleading first impression
+  of the app.
+- **Fix:** `CallEngine` disables registration after the first Unauthorized/Forbidden; rule R8.
+- **Rule:** R8.

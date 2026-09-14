@@ -247,10 +247,25 @@ public final class CallEngine {
         case .Ok: registration = .registered
         case .Progress, .Refreshing: registration = .registering
         case .Cleared: registration = .cleared
-        case .Failed: registration = .failed(Self.registrationFailureText(sdkAccount?.errorInfo, message))
+        case .Failed:
+            registration = .failed(Self.registrationFailureText(sdkAccount?.errorInfo, message))
+            stopRetryingAfterAuthFailure()
         case .None: registration = account == nil ? .unconfigured : .cleared
         }
         Diagnostics.sip.info("registration \(String(describing: state), privacy: .public): \(message, privacy: .public)")
+    }
+
+    /// A wrong credential must not be retried: liblinphone re-sends the same digest until the edge
+    /// bans the source IP (Kamailio: 10 failed authentications -> 5 minutes of silent drops, which the
+    /// client then sees as 408 timeouts; happened 2026-09-14). Registration stays off until the user
+    /// re-enters the account (`configure`), which creates a fresh Account with register enabled.
+    private func stopRetryingAfterAuthFailure() {
+        guard let sdkAccount, let reason = sdkAccount.errorInfo?.reason,
+              reason == .Unauthorized || reason == .Forbidden,
+              let params = sdkAccount.params?.clone() else { return }
+        params.registerEnabled = false
+        sdkAccount.params = params
+        Diagnostics.sip.warning("registration disabled after an authentication failure; fix the account and register again")
     }
 
     /// liblinphone reports transport problems as "io error"; say what a user can act on.
@@ -258,7 +273,7 @@ public final class CallEngine {
         guard let info else { return message }
         switch info.reason {
         case .IOError: return "cannot reach the edge (network, port or certificate)"
-        case .Unauthorized, .Forbidden: return "wrong extension or password"
+        case .Unauthorized, .Forbidden: return "wrong extension or password (registration stopped)"
         case .NotFound: return "unknown extension or domain"
         default:
             if info.protocolCode > 0, let phrase = info.phrase { return "\(info.protocolCode) \(phrase)" }
