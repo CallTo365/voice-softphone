@@ -32,9 +32,14 @@
   the app and rang (180). Two crashes at call start before that: the wrapper's unretained `LoggingService`
   pointer (R9), fixed in the commit after 76cb8a6.
 
+- **22:53 CEST, phase 0 exit met on the simulator:** call to `*98` (voicemail menu, TTS prompts): 200 OK
+  in 140 ms, `opus/48000 · SRTP · ↓ 67 ↑ 60 kbit/s · loss 1%/0% · jitter 56 ms` shown live on the call
+  screen (new media-stats line from `onCallStatsUpdated`), i.e. real audio content in both directions
+  without relying on ears. Ended by the app's BYE.
+
 ## Open threads
-- Phase 0 exit criterion: signalling, SRTP and RTP/RTCP flow are proven; the owner confirms audible
-  two-way audio (echo heard from the simulator's Mac microphone) and a 1001 <-> 1002 call with Bria.
+- 1001 <-> 1002 with Bria on a real phone (the 22:31 attempt got only `100 Trying`: 1002 was not
+  ringing anywhere) and the owner's ear test are the remaining human checks; then phase 1 (CallKit).
 - Kamailio dead-branch handling (P3): `remove_branch` vs `event_route[tcp:closed]` + `ul.rm`, to be
   decided in the platform build pass with a SIPp/real-phone test.
 - Password field: phase 3 replaces it with enrollment; until then the dev screen is the only way in.

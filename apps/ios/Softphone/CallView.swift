@@ -22,6 +22,14 @@ struct CallView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
+                if let media = engine.call?.media {
+                    Text(media.summary)
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .monospacedDigit()
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                }
             }
             Spacer()
 

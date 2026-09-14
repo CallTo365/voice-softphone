@@ -230,6 +230,9 @@ public final class CallEngine {
             onCallStateChanged: { _, call, state, message in
                 MainActor.assumeIsolated { CallEngine.current?.callStateChanged(call, state, message) }
             },
+            onCallStatsUpdated: { _, call, stats in
+                MainActor.assumeIsolated { CallEngine.current?.statsUpdated(call, stats) }
+            },
             onAudioDevicesListUpdated: { core in
                 MainActor.assumeIsolated { CallEngine.current?.refreshAudioDevices(core) }
             },
@@ -336,6 +339,30 @@ public final class CallEngine {
         default:
             call?.sdkState = String(describing: state)
         }
+    }
+
+    private func statsUpdated(_ sdk: Call, _ stats: CallStats) {
+        guard stats.type == .Audio, let current = sdkCall, current === sdk, call != nil else { return }
+        let params = sdk.currentParams
+        let codec = params?.usedAudioPayloadType.map { "\($0.mimeType)/\($0.clockRate)" } ?? "?"
+        let encryption: String
+        switch params?.mediaEncryption {
+        case .SRTP: encryption = "SRTP"
+        case .ZRTP: encryption = "ZRTP"
+        case .DTLS: encryption = "DTLS-SRTP"
+        case .None: encryption = "no encryption"
+        case nil: encryption = "?"
+        }
+        call?.media = MediaStats(
+            codec: codec,
+            encryption: encryption,
+            downloadKbps: stats.downloadBandwidth,
+            uploadKbps: stats.uploadBandwidth,
+            receiverLossPercent: stats.receiverLossRate,
+            senderLossPercent: stats.senderLossRate,
+            jitterMs: stats.jitterBufferSizeMs,
+            roundTripMs: stats.roundTripDelay * 1000
+        )
     }
 
     private func upsertOutgoing(_ sdk: Call, phase: CallPhase, state: Call.State) {

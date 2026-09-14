@@ -55,6 +55,8 @@ public struct ActiveCall: Equatable, Sendable {
     public var connectedAt: Date?
     public var muted: Bool = false
     public var speakerOn: Bool = false
+    /// Live media facts, refreshed by the SDK about once per second while streams run.
+    public var media: MediaStats?
 
     public var displayName: String {
         if let n = remoteName, !n.isEmpty { return n }
@@ -77,5 +79,23 @@ public enum SoftphoneError: Error, Equatable, Sendable {
         case .sdk(let m): "Call failed: \(m)"
         case .busy: "Another call is in progress."
         }
+    }
+}
+
+/// What the call screen shows under the timer so a test does not depend on ears: codec, encryption,
+/// bitrate in both directions and loss. Download > 0 with an echo service means audio came back.
+public struct MediaStats: Equatable, Sendable {
+    public var codec: String            // e.g. "opus/48000"
+    public var encryption: String       // "SRTP", "none", ...
+    public var downloadKbps: Float
+    public var uploadKbps: Float
+    public var receiverLossPercent: Float
+    public var senderLossPercent: Float
+    public var jitterMs: Float
+    public var roundTripMs: Float
+
+    public var summary: String {
+        String(format: "%@ · %@ · ↓ %.0f ↑ %.0f kbit/s · loss %.0f%%/%.0f%% · jitter %.0f ms",
+               codec, encryption, downloadKbps, uploadKbps, receiverLossPercent, senderLossPercent, jitterMs)
     }
 }
