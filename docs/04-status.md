@@ -52,11 +52,14 @@
   deployed too.
 - Simulator: enrolled with a code (twice, same device id re-used), one `GET …/caller-ids` per sheet open, chose
   "Hugo Mobiel", outbound calls carried `P-Preferred-Identity: <sip:+32473981616@acme.sip.local>` (11:51 to a
-  mobile, 12:00 to `*98`). Owner to confirm the displayed number and the timeline's `caller_id_layer: per_call`.
+  mobile, 12:00 to `*98`). First real call presented the default: the control plane read the wrong FreeSWITCH
+  variable (`sip_h_…` instead of `sip_P-Preferred-Identity`, platform branch `softphone/ppi-variable-fix` 099d506,
+  merged + deployed by the owner). **Verified by the owner afterwards: the outbound leg's P-Asserted-Identity shows
+  +32473981616.** docs/05 is complete.
 
 ## Open threads
-- 1001 <-> 1002 with Bria on a real phone (the 22:31 attempt got only `100 Trying`: 1002 was not
-  ringing anywhere) and the owner's ear test are the remaining human checks; then phase 1 (CallKit).
+- 1001 <-> 1002 with Bria on a real phone and the owner's ear test remain as human checks.
+- Next block: phase 1 (CallKit; needs the Team ID for a device build) or P3/P4 push (needs the APNs `.p8`).
 - Kamailio dead-branch handling (P3): `remove_branch` vs `event_route[tcp:closed]` + `ul.rm`, to be
   decided in the platform build pass with a SIPp/real-phone test.
 - Password field: phase 3 replaces it with enrollment; until then the dev screen is the only way in.
