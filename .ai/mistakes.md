@@ -30,6 +30,10 @@ The **Log** is append-only.
 - R9. Any linphonesw object whose C counterpart calls back into Swift (Core, LoggingService, Account,
   Call with delegates) must be held in a stored property for as long as callbacks can arrive: the
   wrapper stores unretained Swift pointers in the C objects and callbacks may come from any thread.
+- R10. Before handing the owner a platform deploy command, read the deploy recipe in
+  `../voice-platform/docs/23-status.md` on *current* `origin/main` — it changed within a day (cluster compose file
+  pair, `rsync --delete` export, `--scale control-plane=3` on every `up` that includes control-plane, never `tar -x`
+  over the tree). A recipe that worked yesterday is not evidence it works today.
 - R7. The liblinphone Core is created with `configPath: nil`. A config file persists accounts, auth info
   (password/ha1) and `verify_server_certs` in plain text and restores them at the next launch; the
   Keychain is the only credential store and `start()` re-applies everything.
@@ -111,3 +115,14 @@ Template (copy, fill, append at the end):
 - **Fix:** `CallEngine.sdkLogging` keeps the wrapper alive for the engine's lifetime (as the Linphone
   app does). Rule R9.
 - **Rule:** R9.
+
+### 2026-09-15 — P5/P8 deploy command used yesterday's recipe; the VM stack was half-recreated
+- **What happened:** the deploy command I gave (`git archive | ssh tar -x`, then `docker compose up -d --build
+  --force-recreate <five services>` with the single compose file) made compose recreate postgres/nats and collapse the
+  three control-plane replicas; a daemon race on `control-plane-2` aborted it half-way.
+- **Root cause:** the platform moved to the cluster compose pair with scaled replicas and an rsync export during the
+  night (docs/23 "Deploy ="), and I reused the P1 recipe from the evening before without re-reading that page.
+- **Impact:** the test VM stack was partly down until the recovery command; the tree on the VM is a tar superset until
+  the rsync export runs.
+- **Fix:** recovery = cluster `up -d` with both scale flags; then the documented rsync export + `--no-deps` rebuild.
+- **Rule:** R10.
