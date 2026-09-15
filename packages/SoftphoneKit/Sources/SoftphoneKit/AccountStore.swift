@@ -37,6 +37,23 @@ public struct AccountStore: Sendable {
         try delete(key: "sip-account")
     }
 
+    // MARK: Device enrollment
+
+    public func loadEnrollment() throws -> DeviceEnrollment? {
+        guard let data = try read(key: "device-enrollment") else { return nil }
+        guard let e = try? JSONDecoder().decode(DeviceEnrollment.self, from: data) else { throw Failure.encoding }
+        return e
+    }
+
+    public func save(_ enrollment: DeviceEnrollment) throws {
+        guard let data = try? JSONEncoder().encode(enrollment) else { throw Failure.encoding }
+        try write(key: "device-enrollment", data: data)
+    }
+
+    public func clearEnrollment() throws {
+        try delete(key: "device-enrollment")
+    }
+
     // MARK: Instance id
 
     /// Lowercase UUID, created once per installation. liblinphone renders it as

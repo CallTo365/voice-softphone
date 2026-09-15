@@ -2,8 +2,10 @@ import SwiftUI
 import SoftphoneKit
 
 struct DialerView: View {
+    @Environment(AppSession.self) private var session
     @Environment(CallEngine.self) private var engine
     @State private var number = ""
+    @State private var showCallerIDs = false
 
     private let keys: [[String]] = [["1", "2", "3"], ["4", "5", "6"], ["7", "8", "9"], ["*", "0", "#"]]
 
@@ -18,6 +20,21 @@ struct DialerView: View {
                     .minimumScaleFactor(0.5)
                     .padding(.horizontal)
 
+                if let store = session.callerIDs {
+                    // Opens the sheet; nothing is fetched until then (docs/05).
+                    Button { showCallerIDs = true } label: {
+                        HStack(spacing: 4) {
+                            Text("From:").foregroundStyle(.secondary)
+                            Text(store.summary)
+                            Image(systemName: "chevron.up.chevron.down").font(.caption2).foregroundStyle(.secondary)
+                        }
+                        .font(.footnote)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Caller ID: \(store.summary)")
+                    .sheet(isPresented: $showCallerIDs) { CallerIDSheet(store: store) }
+                }
+
                 Keypad(keys: keys) { key in number.append(key) }
 
                 HStack(spacing: 40) {
@@ -30,7 +47,7 @@ struct DialerView: View {
                     .opacity(number.isEmpty ? 0 : 1)
 
                     Button {
-                        engine.placeCall(to: number)
+                        session.placeCall(to: number)
                     } label: {
                         Image(systemName: "phone.fill")
                             .font(.title)
@@ -56,9 +73,12 @@ struct DialerView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
+                        if let e = session.enrollment {
+                            Text("\(e.userDisplayName) · \(e.tenantName)")
+                        }
                         Text("liblinphone \(engine.sdkVersion)")
                         Text("instance \(engine.instanceID.prefix(8))…")
-                        Button("Sign out", role: .destructive) { engine.removeAccount() }
+                        Button("Sign out", role: .destructive) { session.signOut() }
                     } label: {
                         Image(systemName: "gearshape")
                     }

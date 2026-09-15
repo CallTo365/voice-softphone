@@ -162,7 +162,9 @@ public final class CallEngine {
 
     // MARK: Call intents
 
-    public func placeCall(to raw: String) {
+    /// Places a call. `preferredIdentity` is the `P-Preferred-Identity` value for the caller-ID choice
+    /// (docs/05 §3, e.g. `<sip:+31856662750@acme.sip.local>`); nil lets the platform decide.
+    public func placeCall(to raw: String, preferredIdentity: String? = nil) {
         guard let core, let account else { lastError = .notConfigured; return }
         guard registration.isRegistered else { lastError = .notRegistered; return }
         guard call == nil else { lastError = .busy; return }
@@ -172,13 +174,17 @@ public final class CallEngine {
         }
         do {
             let address = try Factory.Instance.createAddress(addr: uri)
-            guard let sdkCall = core.inviteAddress(addr: address) else {
+            let params = try core.createCallParams(call: nil)
+            if let preferredIdentity {
+                params.addCustomHeader(headerName: "P-Preferred-Identity", headerValue: preferredIdentity)
+            }
+            guard let sdkCall = core.inviteAddressWithParams(addr: address, params: params) else {
                 lastError = .sdk("invite returned nil")
                 return
             }
             self.sdkCall = sdkCall
             lastError = nil
-            Diagnostics.sip.info("invite \(uri, privacy: .public) call-id \(sdkCall.callLog?.callId ?? "?", privacy: .public)")
+            Diagnostics.sip.info("invite \(uri, privacy: .public) call-id \(sdkCall.callLog?.callId ?? "?", privacy: .public) ppi \(preferredIdentity ?? "-", privacy: .public)")
         } catch {
             lastError = .sdk(String(describing: error))
         }

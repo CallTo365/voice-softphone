@@ -50,6 +50,10 @@ targets:
         ITSAppUsesNonExemptEncryption: false
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
+        # callto://enroll?code=…&api=… links from the admin UI (docs/05, ADR-0004)
+        CFBundleURLTypes:
+          - CFBundleURLName: com.callto365.softphone.enroll
+            CFBundleURLSchemes: [callto]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.callto365.softphone
