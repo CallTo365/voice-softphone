@@ -46,6 +46,14 @@
 - Next in this repo: `PlatformAPI` + enrollment screen (code entry, `callto://enroll` link), `CallerIDStore` + dialer
   sheet (fetch on open, 5-minute cache), `P-Preferred-Identity` on `placeCall`.
 
+## 2026-09-15 12:00 — enrollment + caller-ID selection live end to end
+- Platform P5/P8 deployed by the owner (main, cluster recipe; my first deploy command used the previous day's
+  recipe and half-recreated the stack, R10). QR code in the Devices tab (branch `softphone/qr-enrollment`, f381c70)
+  deployed too.
+- Simulator: enrolled with a code (twice, same device id re-used), one `GET …/caller-ids` per sheet open, chose
+  "Hugo Mobiel", outbound calls carried `P-Preferred-Identity: <sip:+32473981616@acme.sip.local>` (11:51 to a
+  mobile, 12:00 to `*98`). Owner to confirm the displayed number and the timeline's `caller_id_layer: per_call`.
+
 ## Open threads
 - 1001 <-> 1002 with Bria on a real phone (the 22:31 attempt got only `100 Trying`: 1002 was not
   ringing anywhere) and the owner's ear test are the remaining human checks; then phase 1 (CallKit).
