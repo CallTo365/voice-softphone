@@ -11,8 +11,10 @@ is remembered on the device (per user); every outbound call carries it. Selectin
 the API and never changes what other devices of the user present (D11).
 
 Nothing is fetched when the dialer appears (the owner's requirement). The list is loaded when the
-sheet opens: a spinner on the first open, then the items; the next opens show the cached list at once
-and refresh it in the background when it is older than 5 minutes. Pull-to-refresh forces a reload.
+sheet opens: a spinner on the first open, then the items; every later open shows the cached list at once
+and refreshes it in the background (re-opens within ten seconds are coalesced). Pull-to-refresh forces a
+reload. Changed 2026-09-15 from a 5-minute cache: a number verified and shared in the admin UI must show
+up on the next open, not five minutes later.
 If the platform later rejects a choice (number no longer presentable), the app clears the stored choice
 and says so once.
 
@@ -23,9 +25,8 @@ and says so once.
   active_caller_id, active_caller_id_until, default:{number, layer, anonymous}}`
 
 Cache: in memory in `CallerIDStore` (SoftphoneKit), keyed by `user_id`, with `fetched_at`; the chosen
-number in `UserDefaults` (`callerId.<user_id>`; it is not a secret). Invalidation: TTL 5 min,
-pull-to-refresh, a `422 caller_id_not_allowed`/timeline rejection, and later (phase 5) the live-state
-event `user.caller_id.changed`.
+number in `UserDefaults` (`callerId.<user_id>`; it is not a secret). Refresh on every open (10 s
+coalescing), pull-to-refresh, and later (phase 5) the live-state event `user.caller_id.changed`.
 
 ## 3. How the choice reaches the call (D11)
 

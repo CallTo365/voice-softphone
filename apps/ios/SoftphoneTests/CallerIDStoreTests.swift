@@ -42,11 +42,11 @@ struct CallerIDStoreTests {
         return d
     }
 
-    @Test func fetchesOnFirstLoadAndCachesWithinTTL() async {
+    @Test func fetchesOnEveryOpenExceptImmediateReopens() async {
         StubProtocol.requests = []
         StubProtocol.responder = { _ in (200, Data(callerIDsJSON.utf8)) }
         var clock = Date(timeIntervalSince1970: 1_000_000)
-        let store = CallerIDStore(api: stubbedAPI(), tenantID: "t", userID: "u", defaults: freshDefaults(), ttl: 300, now: { clock })
+        let store = CallerIDStore(api: stubbedAPI(), tenantID: "t", userID: "u", defaults: freshDefaults(), ttl: 10, now: { clock })
 
         #expect(store.isStale)
         #expect(store.summary == "Default caller ID")   // nothing fetched by construction
@@ -60,13 +60,14 @@ struct CallerIDStoreTests {
         #expect(store.summary == "+31856662751 (default)")
         #expect(!store.isStale)
 
-        clock = clock.addingTimeInterval(120)
+        clock = clock.addingTimeInterval(3)
         await store.load()
-        #expect(StubProtocol.requests.count == 1)        // cached
+        #expect(StubProtocol.requests.count == 1)        // re-opened within seconds: coalesced
 
-        clock = clock.addingTimeInterval(300)
+        clock = clock.addingTimeInterval(30)
         await store.load()
-        #expect(StubProtocol.requests.count == 2)        // stale -> refetched
+        #expect(StubProtocol.requests.count == 2)        // next open: refreshed (a number added meanwhile shows up)
+        #expect(!store.items.isEmpty)
 
         await store.load(force: true)
         #expect(StubProtocol.requests.count == 3)

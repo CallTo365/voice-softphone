@@ -2,8 +2,8 @@ import Foundation
 import Observation
 
 /// The caller IDs this user may present (docs/05). Nothing is fetched until `load()` is called — the dialer
-/// calls it when the sheet opens, not when the screen appears — and the result is kept for `ttl`; a later open
-/// shows the cached list at once and refreshes in the background when it is stale.
+/// calls it when the sheet opens, not when the screen appears. Every open refreshes: the cached list is shown at
+/// once and replaced when the request returns; `ttl` only coalesces re-opens within a few seconds.
 ///
 /// The choice is per device and per user (`UserDefaults`, not a secret) and is sent on every call as
 /// `P-Preferred-Identity`; the platform validates it (platform ADR-0043). `nil` = let the platform decide.
@@ -28,7 +28,7 @@ public final class CallerIDStore {
     @ObservationIgnored private let now: () -> Date
 
     public init(api: PlatformAPI, tenantID: String, userID: String, defaults: UserDefaults = .standard,
-                ttl: TimeInterval = 300, now: @escaping () -> Date = Date.init) {
+                ttl: TimeInterval = 10, now: @escaping () -> Date = Date.init) {
         self.api = api
         self.tenantID = tenantID
         self.userID = userID
@@ -60,7 +60,7 @@ public final class CallerIDStore {
         return "Default caller ID"
     }
 
-    /// Fetches when nothing is cached or the cache is older than the TTL (or `force`). Concurrent calls coalesce.
+    /// Fetches unless a fetch just happened (within `ttl`) or is running; `force` ignores the TTL. Concurrent calls coalesce.
     public func load(force: Bool = false) async {
         guard force || isStale, !isLoading else { return }
         isLoading = true
