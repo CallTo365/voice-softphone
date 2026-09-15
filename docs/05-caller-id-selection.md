@@ -1,6 +1,6 @@
 # Outbound caller-ID selection in the app
 
-Status: **proposed 2026-09-15**, decisions D11-D13 open (docs/01 section 9).
+Status: **built 2026-09-15** (D11-D13 approved). Platform: ADR-0042/0043 deployed to the VM; app: `PlatformAPI`, `AppSession`, `EnrollView` (QR scan or typed code), `CallerIDStore`, the From control + sheet, `P-Preferred-Identity` on calls.
 
 ## 1. What the user gets
 
@@ -51,6 +51,12 @@ to the normal resolution (active selection -> default) and writes a timeline ent
 `403 caller_id_not_allowed` and let the app show it — stricter, but a stale list then blocks calls.
 
 ## 5. Authentication (D12)
+
+Enrollment is a QR code (the admin UI renders `enroll_url` as an SVG next to the text code) scanned by the app, or
+the code typed. The phone sends *P-Preferred*-Identity, never P-Asserted-Identity: RFC 3325 lets a UA state a
+preference to its trusted proxy, and the platform asserts the identity toward the carrier itself after validation
+(`sip_cid_type=pid` on every carrier leg puts the resolved number in the B-leg's PAI and From). A user-sent PAI is
+ignored by design; honouring it would be a spoofing path.
 
 The app has no API access yet. The designed path is phase 3 / platform P5: enrollment code from the
 user sheet -> `POST /v1/auth/device` -> device token accepted by the control plane as principal
