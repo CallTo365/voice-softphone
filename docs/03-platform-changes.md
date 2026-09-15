@@ -141,6 +141,17 @@ Notes for the build pass (rule R1 there: verify each function on 5.8.6 before us
   timeline shows "moved from iPhone to iPad".
 - Push for the move INVITE follows P3/P4 unchanged (the target may be backgrounded).
 
+## P8. Per-call caller ID from the phone (docs/05, decision D11)
+
+`readChannel` (`services/control-plane/internal/esl/session.go`) sets `CallerIDOverride` from
+`sip_h_P-Preferred-Identity` when `Ingress == user` (user part of the URI; `anonymous`), so the existing
+`RouteInput.CallerIDPerCall` validation applies to phone calls as it does to API originates. Not allowed
+(D13): fall back to the normal resolution and add a timeline entry `caller_id_override_rejected
+{requested, presented}`. Contract §15: "per-call override also from `P-Preferred-Identity` on user
+ingress". Check that Kamailio strips `P-Preferred-Identity`/`P-Asserted-Identity` on every non-user
+ingress (carriers, tenant trunks, agent gateway) before honouring the header anywhere. ADR in the
+platform repo.
+
 ## P7. Recents for the user (phase 5)
 
 If the tenant CDR list already accepts the OIDC/device `user` role and filters to the caller's own

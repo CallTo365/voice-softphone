@@ -155,6 +155,14 @@ in `voice-platform` (see `docs/03-platform-changes.md`).
 | D9 | Codecs | Opus (preferred) + PCMA, 20 ms, DTX on; FreeSWITCH transcodes toward PSTN as today. Confirm opus is enabled on the worker profile |
 | D10 | Test VM exposure | Open 5061/tcp + RTP to the internet on `voice-mvp-fw` for mobile-network tests (P2) |
 
+Added 2026-09-15 (docs/05, caller-ID selection) — **open**:
+
+| Id | Question | Recommendation |
+|---|---|---|
+| D11 | How the chosen caller ID reaches the call | Per call: `P-Preferred-Identity` on the INVITE, validated by the router (platform P8); not the user-wide active selection |
+| D12 | API access for the app | Build P5 (enrollment code -> device token) now; no throwaway API-key path |
+| D13 | Choice not allowed | Fall back to the normal resolution + timeline entry `caller_id_override_rejected`; the app clears its stored choice |
+
 ## 10. Risks and how the plan handles them
 
 - **Push privilege loss** (Apple kills apps that receive a VoIP push and do not report a call): S1, the
