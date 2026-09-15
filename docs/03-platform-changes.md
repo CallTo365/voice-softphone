@@ -109,7 +109,12 @@ Notes for the build pass (rule R1 there: verify each function on 5.8.6 before us
   `src/core/app/ios-app-delegate.mm`); keep `caller_*` optional (D8).
 - Config: `APNS_TEAM_ID`, `APNS_KEY_ID`, `APNS_KEY_P8_BASE64`, `APNS_BUNDLE_ID` in `.env` (G8).
 
-## P5. Enrollment, device auth, devices UI (phase 3, ADR-0004)
+## P5. Enrollment, device auth, devices UI (phase 3, ADR-0004) — built 2026-09-15, platform branch `softphone/p5-p8-enrollment-callerid` (7a45f2d), platform ADR-0042, migration 0045, contract §7.2 rewritten; deploy pending
+
+What landed differs from the sketch below in two ways: the device bearer resolves to the **user** principal with a
+`device_id` (no separate `device` kind), and the self-service routes live under `/v1/me/devices` (+ admin variants
+under the user). Enrollment codes are 8 characters (`ABCD-2345`, 10 minutes, single use), the response carries
+`sip:{domain, username, ha1, realm, server, port, transport}`.
 
 - Table `platform.device_enrollments(id, tenant_id, user_id, code_hash, expires_at, used_at,
   created_by)` (migration `0042`). Codes: 8 characters, 10-minute validity, single use, shown as text
@@ -141,7 +146,7 @@ Notes for the build pass (rule R1 there: verify each function on 5.8.6 before us
   timeline shows "moved from iPhone to iPad".
 - Push for the move INVITE follows P3/P4 unchanged (the target may be backgrounded).
 
-## P8. Per-call caller ID from the phone (docs/05, decision D11)
+## P8. Per-call caller ID from the phone (docs/05, decision D11) — built 2026-09-15 on the same branch, platform ADR-0043, contract §15
 
 `readChannel` (`services/control-plane/internal/esl/session.go`) sets `CallerIDOverride` from
 `sip_h_P-Preferred-Identity` when `Ingress == user` (user part of the URI; `anonymous`), so the existing

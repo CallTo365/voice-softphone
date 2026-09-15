@@ -37,6 +37,15 @@
   screen (new media-stats line from `onCallStatsUpdated`), i.e. real audio content in both directions
   without relying on ears. Ended by the app's BYE.
 
+## 2026-09-15 — P5 + P8 built in voice-platform
+- Branch `softphone/p5-p8-enrollment-callerid` (7a45f2d, rebased on main): enrollment codes from the user sheet's new
+  Devices tab, `POST /v1/auth/device` -> `dvt_` bearer + SIP identity with `ha1` and `SIP_TLS_HOST`, device bearer =
+  user principal in control plane, live-state and presence; `P-Preferred-Identity` honoured on user ingress with the
+  `call.caller_id.override_rejected` timeline entry. Platform ADR-0042/0043, migration 0045. Verified with Go and UI
+  test suites and an integration test against the local Postgres; not yet deployed to the VM.
+- Next in this repo: `PlatformAPI` + enrollment screen (code entry, `callto://enroll` link), `CallerIDStore` + dialer
+  sheet (fetch on open, 5-minute cache), `P-Preferred-Identity` on `placeCall`.
+
 ## Open threads
 - 1001 <-> 1002 with Bria on a real phone (the 22:31 attempt got only `100 Trying`: 1002 was not
   ringing anywhere) and the owner's ear test are the remaining human checks; then phase 1 (CallKit).
