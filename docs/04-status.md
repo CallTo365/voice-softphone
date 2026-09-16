@@ -63,6 +63,13 @@
 - Platform branch `softphone/call-id-header-and-user-recording` (1f03484): `multiset sip_ph_/sip_rh_X-Call-ID-Platform`
   on user A-legs, recording control for the user on the call. Not yet deployed.
 
+- 2026-09-16 afternoon: owner's tests found (1) Hold/Record disabled once the platform's hold re-INVITE put the
+  phone in `.held` — fixed d71ca3f; (2) no hold music — platform gap (`uuid_hold` with no `hold_music` on the
+  source-built workers), fixed on branch `softphone/hold-music` (9a8e7ed, merged + deployed 14:2xZ: the queue
+  fallback tone; tenant hold-music media is the follow-up in the platform's docs/23); (3) internal extension →
+  extension calls to the app drop with BYE cause 16 right after answer — platform log for call
+  189e0018-9170-475b-981e-2f164e581c75 requested, cause unknown yet.
+
 ## Open threads
 - 1001 <-> 1002 with Bria on a real phone and the owner's ear test remain as human checks.
 - Next block: phase 1 (CallKit; needs the Team ID for a device build) or P3/P4 push (needs the APNs `.p8`).
