@@ -57,6 +57,12 @@
   merged + deployed by the owner). **Verified by the owner afterwards: the outbound leg's P-Asserted-Identity shows
   +32473981616.** docs/05 is complete.
 
+## 2026-09-16 — hold and on-demand recording in the call screen (docs/06)
+- App: `platformCallID` captured from `X-Call-ID-Platform` (INVITE / 18x / 200), Hold and Record buttons calling
+  `/v1/calls/{id}/hold|unhold|record` with the device bearer, status line marks, readable errors; 25 tests.
+- Platform branch `softphone/call-id-header-and-user-recording` (1f03484): `multiset sip_ph_/sip_rh_X-Call-ID-Platform`
+  on user A-legs, recording control for the user on the call. Not yet deployed.
+
 ## Open threads
 - 1001 <-> 1002 with Bria on a real phone and the owner's ear test remain as human checks.
 - Next block: phase 1 (CallKit; needs the Team ID for a device build) or P3/P4 push (needs the APNs `.p8`).

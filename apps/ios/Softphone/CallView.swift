@@ -4,6 +4,7 @@ import SoftphoneKit
 /// The in-call screen for phase 0 (foreground only). Phase 1 keeps this screen and adds CallKit
 /// behind it; the buttons then go through CallKit actions instead of calling the engine directly.
 struct CallView: View {
+    @Environment(AppSession.self) private var session
     @Environment(CallEngine.self) private var engine
     @State private var showKeypad = false
     @State private var now = Date()
@@ -45,6 +46,25 @@ struct CallView: View {
                         ToggleButton(symbol: "circle.grid.3x3.fill", label: "Keypad", isOn: showKeypad) { showKeypad.toggle() }
                         ToggleButton(symbol: "speaker.wave.2.fill", label: "Speaker", isOn: call.speakerOn) { engine.toggleSpeaker() }
                     }
+                    // Platform actions (S2): hold and on-demand recording go through /v1/calls/{id}; both need the
+                    // platform call id, which arrives with the INVITE (inbound) or the 18x/200 (outbound).
+                    HStack(spacing: 40) {
+                        ToggleButton(symbol: "pause.fill", label: call.heldByMe ? "Resume" : "Hold", isOn: call.heldByMe,
+                                     enabled: call.phase == .active && call.platformCallID != nil && !session.controlBusy) {
+                            Task { await session.toggleHold() }
+                        }
+                        ToggleButton(symbol: "record.circle", label: call.recording ? "Recording" : "Record", isOn: call.recording,
+                                     tint: .red, enabled: call.phase == .active && call.platformCallID != nil && !session.controlBusy) {
+                            Task { await session.toggleRecording() }
+                        }
+                    }
+                    if let error = session.controlError {
+                        Text(error.userMessage)
+                            .font(.footnote)
+                            .foregroundStyle(.red)
+                            .multilineTextAlignment(.center)
+                            .onTapGesture { session.clearControlError() }
+                    }
                     RoundButton(symbol: "phone.down.fill", label: "End", tint: .red) { engine.hangUp() }
                 }
             }
@@ -68,7 +88,12 @@ struct CallView: View {
         case .incomingPush, .incoming: return "Incoming call"
         case .dialing: return "Calling…"
         case .ringing: return "Ringing…"
-        case .active: return call.connectedAt.map { Self.duration(since: $0, now: now) } ?? "Connected"
+        case .active:
+            let t = call.connectedAt.map { Self.duration(since: $0, now: now) } ?? "Connected"
+            var marks: [String] = []
+            if call.heldByMe { marks.append("on hold") }
+            if call.recording { marks.append("● recording") }
+            return marks.isEmpty ? t : t + " · " + marks.joined(separator: " · ")
         case .held: return "On hold"
         case .ending: return "Ending…"
         case .ended(let reason): return "Call ended · \(reason)"
@@ -105,6 +130,8 @@ private struct ToggleButton: View {
     let symbol: String
     let label: String
     let isOn: Bool
+    var tint: Color = .primary
+    var enabled: Bool = true
     let action: () -> Void
 
     var body: some View {
@@ -113,9 +140,11 @@ private struct ToggleButton: View {
                 Image(systemName: symbol)
                     .font(.title2)
                     .frame(width: 64, height: 64)
-                    .background(isOn ? Color.primary : Color(.secondarySystemBackground), in: Circle())
+                    .background(isOn ? tint : Color(.secondarySystemBackground), in: Circle())
                     .foregroundStyle(isOn ? Color(.systemBackground) : Color.primary)
             }
+            .disabled(!enabled)
+            .opacity(enabled ? 1 : 0.4)
             Text(label).font(.caption).foregroundStyle(.secondary)
         }
     }

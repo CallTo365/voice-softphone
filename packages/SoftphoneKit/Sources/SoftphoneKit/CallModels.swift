@@ -57,6 +57,13 @@ public struct ActiveCall: Equatable, Sendable {
     public var speakerOn: Bool = false
     /// Live media facts, refreshed by the SDK about once per second while streams run.
     public var media: MediaStats?
+    /// The platform's call id (X-Call-ID-Platform on the INVITE for inbound, on 18x/200 for outbound; contract §3).
+    /// Needed for hold, recording, transfer and move through /v1/calls/{id}; nil until the platform stamped it.
+    public var platformCallID: String?
+    /// Platform-side hold requested from this device (the far end hears music; contract §10.6).
+    public var heldByMe: Bool = false
+    /// On-demand recording started from this device (contract §12.8).
+    public var recording: Bool = false
 
     public var displayName: String {
         if let n = remoteName, !n.isEmpty { return n }

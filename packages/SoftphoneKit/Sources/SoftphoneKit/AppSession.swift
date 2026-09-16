@@ -69,6 +69,50 @@ public final class AppSession {
         api = nil
     }
 
+    /// Last call-control problem worth showing (hold/record); cleared on the next success.
+    public private(set) var controlError: PlatformAPI.Failure?
+    public private(set) var controlBusy = false
+
+    /// Platform-side hold of the current call (the far end hears music, switchboards see `call.held`).
+    public func toggleHold() async {
+        guard let call = engine.call, let id = call.platformCallID, let api else {
+            controlError = PlatformAPI.Failure(status: 0, code: "no_call_id", message: "The platform has not identified this call yet.")
+            return
+        }
+        await control {
+            if call.heldByMe { try await api.unhold(callID: id) } else { try await api.hold(callID: id) }
+            engine.setHeldByMe(!call.heldByMe)
+        }
+    }
+
+    /// On-demand recording of the current call.
+    public func toggleRecording() async {
+        guard let call = engine.call, let id = call.platformCallID, let api else {
+            controlError = PlatformAPI.Failure(status: 0, code: "no_call_id", message: "The platform has not identified this call yet.")
+            return
+        }
+        await control {
+            try await api.record(callID: id, action: call.recording ? "stop" : "start")
+            engine.setRecording(!call.recording)
+        }
+    }
+
+    public func clearControlError() { controlError = nil }
+
+    private func control(_ op: () async throws -> Void) async {
+        guard !controlBusy else { return }
+        controlBusy = true
+        defer { controlBusy = false }
+        do {
+            try await op()
+            controlError = nil
+        } catch let f as PlatformAPI.Failure {
+            controlError = f
+        } catch {
+            controlError = PlatformAPI.Failure(status: 0, code: "network", message: error.localizedDescription)
+        }
+    }
+
     /// Dials with the caller-ID choice attached (docs/05 §3).
     public func placeCall(to number: String) {
         let ppi = engine.account.flatMap { callerIDs?.preferredIdentity(domain: $0.domain) }

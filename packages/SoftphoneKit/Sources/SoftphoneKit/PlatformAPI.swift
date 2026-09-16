@@ -15,6 +15,8 @@ public struct PlatformAPI: Sendable {
             case "rate_limited": "Too many attempts. Wait a minute and try again."
             case "enrollment_refused": "This user or company is not active."
             case "unauthorized": "This device is no longer enrolled."
+            case "feature_not_licensed", "payment_required": "Recording is not included in your seat."
+            case "not_found": "The platform does not know this call (yet)."
             case "network": "Cannot reach the platform: \(message)"
             default: "\(message) (\(code))"
             }
@@ -93,6 +95,24 @@ public struct PlatformAPI: Sendable {
 
     public func callerIDs(tenantID: String, userID: String) async throws -> CallerIDSet {
         try await send("GET", "/v1/tenants/\(tenantID)/users/\(userID)/caller-ids")
+    }
+
+    // MARK: Call control (contract §10.6, §12.8) — the user on the call
+
+    private struct StatusReply: Codable { var status: String }
+    private struct RecordBody: Codable { var action: String }
+
+    public func hold(callID: String) async throws {
+        let _: StatusReply = try await send("POST", "/v1/calls/\(callID)/hold", body: Empty())
+    }
+
+    public func unhold(callID: String) async throws {
+        let _: StatusReply = try await send("POST", "/v1/calls/\(callID)/unhold", body: Empty())
+    }
+
+    /// `action` is "start" or "stop"; the seat needs the recording feature (402/403 otherwise).
+    public func record(callID: String, action: String) async throws {
+        let _: StatusReply = try await send("POST", "/v1/calls/\(callID)/record", body: RecordBody(action: action))
     }
 
     // MARK: Devices (contract §7.2)

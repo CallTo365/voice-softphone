@@ -315,14 +315,17 @@ public final class CallEngine {
                 sdkState: String(describing: state),
                 startedAt: Date()
             )
+            capturePlatformCallID(sdk)
         case .OutgoingInit, .OutgoingProgress:
             upsertOutgoing(sdk, phase: .dialing, state: state)
         case .OutgoingRinging, .OutgoingEarlyMedia:
             upsertOutgoing(sdk, phase: .ringing, state: state)
+            capturePlatformCallID(sdk)
         case .Connected, .StreamsRunning:
             if call?.connectedAt == nil { call?.connectedAt = Date() }
             call?.phase = .active
             call?.sdkState = String(describing: state)
+            capturePlatformCallID(sdk)
         case .Paused, .PausedByRemote, .Pausing:
             call?.phase = .held
             call?.sdkState = String(describing: state)
@@ -370,6 +373,20 @@ public final class CallEngine {
             roundTripMs: stats.roundTripDelay * 1000
         )
     }
+
+    /// X-Call-ID-Platform from the remote party's last message (the INVITE for inbound, the 18x/200 for outbound).
+    private func capturePlatformCallID(_ sdk: Call) {
+        guard call?.platformCallID == nil else { return }
+        let v = sdk.remoteParams?.getCustomHeader(headerName: "X-Call-ID-Platform").trimmingCharacters(in: .whitespaces) ?? ""
+        if !v.isEmpty {
+            call?.platformCallID = v
+            Diagnostics.sip.info("platform call id \(v, privacy: .public)")
+        }
+    }
+
+    /// Marks platform-side state the app changed through the API (AppSession), so the UI reflects it.
+    public func setHeldByMe(_ held: Bool) { call?.heldByMe = held }
+    public func setRecording(_ on: Bool) { call?.recording = on }
 
     private func upsertOutgoing(_ sdk: Call, phase: CallPhase, state: Call.State) {
         if call == nil {
