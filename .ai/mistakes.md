@@ -34,6 +34,9 @@ The **Log** is append-only.
   `../voice-platform/docs/23-status.md` on *current* `origin/main` — it changed within a day (cluster compose file
   pair, `rsync --delete` export, `--scale control-plane=3` on every `up` that includes control-plane, never `tar -x`
   over the tree). A recipe that worked yesterday is not evidence it works today.
+- R11. A platform branch counts as deployed only when `git merge-base --is-ancestor <sha> main` says so on the
+  owner's checkout (and `.deployed-rev` on the VM matches); a behaviour that "worked" on the next test is not
+  proof the branch went out — inbound calls carried the call id before the branch existed.
 - R7. The liblinphone Core is created with `configPath: nil`. A config file persists accounts, auth info
   (password/ha1) and `verify_server_certs` in plain text and restores them at the next launch; the
   Keychain is the only credential store and `start()` re-applies everything.
@@ -126,3 +129,13 @@ Template (copy, fill, append at the end):
   the rsync export runs.
 - **Fix:** recovery = cluster `up -d` with both scale flags; then the documented rsync export + `--no-deps` rebuild.
 - **Rule:** R10.
+
+### 2026-09-16 — recording/call-id platform branch believed deployed, was never merged
+- **What happened:** the owner's `--ff-only` merge of `softphone/call-id-header-and-user-recording` failed; I handed
+  a `--no-ff` alternative and, on the next report ("outbound worked"), treated the branch as deployed. Two rounds
+  later Record still answered "needs an api key or an operator" — the branch was in neither local nor origin main.
+- **Root cause:** I inferred deployment from an app symptom (buttons enabled) that inbound calls satisfied without
+  the branch, instead of checking the ancestry / `.deployed-rev`.
+- **Impact:** one wasted test round for the owner; the hold-music branch was built on a main without the stamp.
+- **Fix:** rebased and re-merged (d896c5b); rule R11.
+- **Rule:** R11.
