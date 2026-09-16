@@ -202,8 +202,10 @@ public final class CallEngine {
 
     public func hangUp() {
         guard let sdkCall else { return }
+        hungUpLocally = true
         do { try sdkCall.terminate() } catch { lastError = .sdk(String(describing: error)) }
     }
+    @ObservationIgnored private var hungUpLocally = false
 
     public func toggleMute() {
         guard let core, call != nil else { return }
@@ -332,10 +334,11 @@ public final class CallEngine {
         case .Resuming:
             call?.phase = .active
         case .End, .Error:
-            call?.phase = .ended(reason: Self.endReason(sdk, message))
+            call?.phase = .ended(reason: hungUpLocally ? "ended" : Self.endReason(sdk, message))
             call?.sdkState = String(describing: state)
         case .Released:
-            let reason = Self.endReason(sdk, message)
+            let reason = hungUpLocally ? "ended" : Self.endReason(sdk, message)
+            hungUpLocally = false
             call?.phase = .ended(reason: reason)
             sdkCall = nil
             // Keep the ended card briefly for the UI, then clear.
@@ -410,12 +413,13 @@ public final class CallEngine {
             return "\(info.protocolCode) \(info.phrase ?? message)"
         }
         switch sdk.reason {
-        case .None: return "ended"
+        case .None, .Unknown: return sdk.dir == .Incoming || sdk.duration > 0 ? "ended by the other side" : "ended"
         case .Declined: return "declined"
         case .NotAnswered: return "no answer"
         case .Busy: return "busy"
         case .NotFound: return "not found"
-        default: return String(describing: sdk.reason)
+        case .IOError: return "network error"
+        default: return String(describing: sdk.reason).lowercased()
         }
     }
 

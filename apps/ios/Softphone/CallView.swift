@@ -48,13 +48,18 @@ struct CallView: View {
                     }
                     // Platform actions (S2): hold and on-demand recording go through /v1/calls/{id}; both need the
                     // platform call id, which arrives with the INVITE (inbound) or the 18x/200 (outbound).
+                    // Platform hold sends this phone a sendonly re-INVITE (phase .held), so the controls must stay
+                    // usable in .held too; a hold the *other* side put us on is shown, not toggled from here.
+                    let controllable = (call.phase == .active || call.phase == .held) && call.platformCallID != nil && !session.controlBusy
+                    let remoteHeld = call.phase == .held && !call.heldByMe
                     HStack(spacing: 40) {
-                        ToggleButton(symbol: "pause.fill", label: call.heldByMe ? "Resume" : "Hold", isOn: call.heldByMe,
-                                     enabled: call.phase == .active && call.platformCallID != nil && !session.controlBusy) {
+                        ToggleButton(symbol: call.heldByMe ? "play.fill" : "pause.fill",
+                                     label: call.heldByMe ? "Resume" : (remoteHeld ? "Held" : "Hold"), isOn: call.heldByMe,
+                                     enabled: controllable && !remoteHeld) {
                             Task { await session.toggleHold() }
                         }
                         ToggleButton(symbol: "record.circle", label: call.recording ? "Recording" : "Record", isOn: call.recording,
-                                     tint: .red, enabled: call.phase == .active && call.platformCallID != nil && !session.controlBusy) {
+                                     tint: .red, enabled: controllable) {
                             Task { await session.toggleRecording() }
                         }
                     }
@@ -94,7 +99,10 @@ struct CallView: View {
             if call.heldByMe { marks.append("on hold") }
             if call.recording { marks.append("● recording") }
             return marks.isEmpty ? t : t + " · " + marks.joined(separator: " · ")
-        case .held: return "On hold"
+        case .held:
+            let t = call.connectedAt.map { Self.duration(since: $0, now: now) } ?? ""
+            let who = call.heldByMe ? "on hold" : "held by the other party"
+            return (t.isEmpty ? who : t + " · " + who) + (call.recording ? " · ● recording" : "")
         case .ending: return "Ending…"
         case .ended(let reason): return "Call ended · \(reason)"
         }
