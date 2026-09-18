@@ -83,6 +83,8 @@ struct DialerView: View {
                         }
                         Text("liblinphone \(engine.sdkVersion)")
                         Text("instance \(engine.instanceID.prefix(8))…")
+                        Button("Re-register") { engine.refreshRegistration() }
+                            .disabled(engine.account == nil)
                         Button("Diagnostics") { showDiagnostics = true }
                         Button("Sign out", role: .destructive) { session.signOut() }
                     } label: {

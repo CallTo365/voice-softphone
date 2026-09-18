@@ -171,6 +171,20 @@ public final class CallEngine {
     public func enterBackground() { core?.enterBackground() }
     public func enterForeground() { core?.enterForeground() }
 
+    /// Sends a fresh REGISTER now (gear menu "Re-register"; after a network change, a stale contact on the edge, and
+    /// in phase 2 after a push-token change). An account switched off after an authentication failure (R8) is
+    /// re-enabled first, so a fixed password on the edge can be retried without re-enrolling.
+    public func refreshRegistration() {
+        guard let core, let sdkAccount else { return }
+        if let params = sdkAccount.params, !params.registerEnabled, let p = params.clone() {
+            p.registerEnabled = true
+            sdkAccount.params = p
+        }
+        registration = .registering
+        core.refreshRegisters()
+        Diagnostics.record("sip", "re-register requested by the user")
+    }
+
     // MARK: Call intents
 
     /// Places a call. `preferredIdentity` is the `P-Preferred-Identity` value for the caller-ID choice

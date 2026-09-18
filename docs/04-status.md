@@ -89,7 +89,14 @@
   and installed on iPhone H with `devicectl`. **Verified by the owner 10:33Z:** a platform originate to 1001
   (`POST /v1/tenants/{t}/calls`, to `*98`) rang the native CallKit screen, was answered there, two-way audio;
   the platform's record shows answered at 10:32:47Z, NORMAL_CLEARING. First attempt went NO_ANSWER (app freshly
-  launched from the Mac, in the background). Outgoing through CallKit: owner's check pending.
+  launched from the Mac, in the background). **Both directions confirmed from the owner's diagnostics export
+  12:49–12:50 CEST:** incoming `report incoming` → `audio session activated` → `ended by our action`; outgoing
+  `request start accepted` → INVITE with the CallKit uuid → `audio session activated` → ringing → connected →
+  ended through the end action. Owner's expectation note: iOS does not switch to the Phone app for calls the app
+  starts (CallKit gives the lock-screen answer, the Dynamic Island indicator, audio routing, Recents); to check:
+  Phone › Recents rows for those two calls, and a lock-screen answer test.
+- Gear menu › **Re-register** (`Core.refreshRegisters()`, re-enables an account switched off after an auth failure):
+  verified on the simulator — the edge's `kamailio.location` row for the contact was rewritten at the tap.
 - Simulator regression: `*98` from the iPhone 15 simulator still places and ends a call on the direct path.
 
 ## Open threads

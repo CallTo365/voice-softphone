@@ -1,7 +1,8 @@
 # CallKit (phase 1)
 
-Status: **built 2026-09-18**, verified on the owner's iPhone the same day (incoming: platform originate to 1001
-rang the native screen, answered, two-way audio; outgoing: see docs/04). ADR-0001 fixed the model (the app owns
+Status: **built 2026-09-18**, verified on the owner's iPhone the same day in both directions (incoming: platform
+originate to 1001 rang the native screen, answered, two-way audio; outgoing from the dialer through the start
+action; the diagnostics export shows the audio-session hand-over for both — docs/04). ADR-0001 fixed the model (the app owns
 `CXProvider`, the SDK owns `PKPushRegistry`); this page is how the app implements it and the decisions taken
 while doing so (ADR-0005). Push (phase 2) plugs into the same bridge.
 
