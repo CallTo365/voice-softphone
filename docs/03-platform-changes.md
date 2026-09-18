@@ -157,6 +157,17 @@ ingress". Check that Kamailio strips `P-Preferred-Identity`/`P-Asserted-Identity
 ingress (carriers, tenant trunks, agent gateway) before honouring the header anywhere. ADR in the
 platform repo.
 
+## P9. Dialing context: national numbers per user/tenant country — built 2026-09-18, platform branch `softphone/dialing-context` (e27e8f4), platform docs/40 + ADR-0059, migration 0060
+
+The app sends what the user typed (`DialString` only turns `00` into `+` and passes national forms through;
+long-press 0 gives `+`); the platform reads the digits in the caller's dialing country: `users.country`
+(set in the user sheet, or from Entra `usageLocation` under the tenant's sync rule `country_from_directory`)
+falling back to `tenants.country`. `0634443999` from a Dutch user becomes `+31634443999`, `0473981616` from a
+Belgian user in the same tenant `+32473981616`; `+`/`00` forms work as before; a national form without any
+country is refused with reason `unparseable_destination` (the app shows the platform's 404/unallocated text).
+Nothing changes on the wire; the app's `DialString` tests keep the passthrough. Platform docs/40 §9 has the
+built list; contract §3, §12.1, §19.
+
 ## P7. Recents for the user (phase 5)
 
 If the tenant CDR list already accepts the OIDC/device `user` role and filters to the caller's own

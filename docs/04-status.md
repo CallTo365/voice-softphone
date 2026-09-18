@@ -70,6 +70,15 @@
   extension calls to the app drop with BYE cause 16 right after answer — platform log for call
   189e0018-9170-475b-981e-2f164e581c75 requested, cause unknown yet.
 
+## 2026-09-18 — dialing context on the platform (P9)
+- Owner's finding: `0634443999` on the softphone was refused ("forbidden"): the platform read every 8+ digit
+  string as E.164 without `+`. Proposal docs/40 + ADR-0059 in the platform repo approved ("go with the
+  recommendations"), built on `softphone/dialing-context` (e27e8f4, rebased on main f892ab4, pushed): per-country
+  table in code, effective country user → tenant → none, Entra `usageLocation` sync rule, user sheet picker,
+  `unparseable_destination` rejection. Deploy pending (migration 0060 + control-plane ×3 + directory + admin-ui);
+  VM check: 1001 dials `0634443999` on the NL tenant → CDR `to_number=+31634443999`.
+- App side of the same request: long-press 0 → `+` was already in (dae569e). Nothing else changes in the app.
+
 ## Open threads
 - 1001 <-> 1002 with Bria on a real phone and the owner's ear test remain as human checks.
 - Next block: phase 1 (CallKit; needs the Team ID for a device build) or P3/P4 push (needs the APNs `.p8`).
