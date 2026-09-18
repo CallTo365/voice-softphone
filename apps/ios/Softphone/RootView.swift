@@ -1,3 +1,4 @@
+import Intents
 import SwiftUI
 import SoftphoneKit
 
@@ -19,6 +20,13 @@ struct RootView: View {
             set: { _ in }
         )) {
             CallView()
+        }
+        // A tap on one of our calls in the Phone app's Recents (CallKit `includesCallsInRecents`, docs/07): iOS
+        // hands the handle back as an INStartCallIntent; the same path as the dialer, caller-ID choice included.
+        .onContinueUserActivity("INStartCallIntent") { activity in
+            guard let intent = activity.interaction?.intent as? INStartCallIntent,
+                  let number = intent.contacts?.first?.personHandle?.value, !number.isEmpty else { return }
+            session.placeCall(to: number)
         }
         .tint(.primary)
     }

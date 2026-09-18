@@ -48,6 +48,8 @@ targets:
         NSMicrophoneUsageDescription: CallTo needs the microphone for phone calls.
         NSCameraUsageDescription: CallTo uses the camera only to scan the enrollment QR code from your administrator.
         UIBackgroundModes: [voip, audio]
+        # Recents in the Phone app call back into us (CallKit includesCallsInRecents, docs/07)
+        NSUserActivityTypes: [INStartCallIntent]
         ITSAppUsesNonExemptEncryption: false
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false

@@ -6,9 +6,10 @@ import Observation
 /// The single owner of the liblinphone `Core` (docs/01 section 4). Main-actor only: the Core runs
 /// with auto-iterate on the main thread, so every delegate callback arrives here as well.
 ///
-/// Phase 0 scope: register over TLS, place and receive audio calls in the foreground, mute,
-/// speaker, DTMF, hang up. CallKit (phase 1) and push (phase 2) plug in through `CallKitBridge`
-/// hooks that are deliberately not here yet; see docs/02.
+/// Register over TLS, place and receive audio calls, mute, speaker, DTMF, hang up. With a `callKit`
+/// bridge attached (phase 1, real devices) the Core runs CallKit-aware: the audio session is configured
+/// and activated only from the provider callbacks (S4) and every call is reported to CallKit (docs/07).
+/// Push (phase 2) plugs in next to it; see docs/02.
 @MainActor
 @Observable
 public final class CallEngine {
@@ -24,6 +25,8 @@ public final class CallEngine {
     /// What the SDK believes about the network; iOS' own view is in `pathSatisfied`. They disagree on VPNs.
     public private(set) var sdkReachable = true
     public private(set) var pathSatisfied = true
+    /// Set before `start()` on real devices (AppSession); nil = phase-0 direct path (simulator).
+    @ObservationIgnored public var callKit: CallKitBridge?
 
     // MARK: Private
 
@@ -67,8 +70,9 @@ public final class CallEngine {
             core.config?.setString(section: "misc", key: "uuid", value: instanceID)
 
             core.autoIterateEnabled = true
-            // Phase 0 has no CallKit and no push yet; both flip to true in phases 1 and 2.
-            core.callkitEnabled = false
+            // CallKit-aware Core when the bridge exists: the SDK then waits for activateAudioSession() before it
+            // starts audio and leaves ringing to CallKit. Push flips to true in phase 2.
+            core.callkitEnabled = callKit != nil
             core.pushNotificationEnabled = false
             core.setUserAgent(name: "CallTo", version: Self.appVersion)
             // Media: SRTP offered, plain accepted (the edge decides per leg); opus first, PCMA fallback (D9).
@@ -78,13 +82,13 @@ public final class CallEngine {
             core.useRfc2833ForDtmf = true
             core.useInfoForDtmf = false
             core.echoCancellationEnabled = true
-            core.nativeRingingEnabled = false   // becomes CallKit's job in phase 1
+            core.nativeRingingEnabled = false   // ringing is CallKit's (device) or nobody's (simulator)
 
             installCoreDelegate(core)
             try core.start()
             refreshAudioDevices(core)
             startPathMonitor()
-            Diagnostics.record("sip", "core started, liblinphone \(sdkVersion), instance \(instanceID)")
+            Diagnostics.record("sip", "core started, liblinphone \(sdkVersion), instance \(instanceID), callkit \(core.callkitEnabled)")
         } catch {
             Diagnostics.sip.error("core start failed: \(String(describing: error), privacy: .public)")
             lastError = .sdk(String(describing: error))
@@ -170,14 +174,17 @@ public final class CallEngine {
     // MARK: Call intents
 
     /// Places a call. `preferredIdentity` is the `P-Preferred-Identity` value for the caller-ID choice
-    /// (docs/05 §3, e.g. `<sip:+31856662750@acme.sip.local>`); nil lets the platform decide.
-    public func placeCall(to raw: String, preferredIdentity: String? = nil) {
-        guard let core, let account else { lastError = .notConfigured; return }
-        guard registration.isRegistered else { lastError = .notRegistered; return }
-        guard call == nil else { lastError = .busy; return }
+    /// (docs/05 §3, e.g. `<sip:+31856662750@acme.sip.local>`); nil lets the platform decide. `callKitUUID` is
+    /// the id CallKit gave the call (`CXStartCallAction`); with a bridge attached, only the bridge calls this.
+    /// Returns false with `lastError` set when nothing was sent.
+    @discardableResult
+    public func placeCall(to raw: String, preferredIdentity: String? = nil, callKitUUID: UUID? = nil) -> Bool {
+        guard let core, let account else { lastError = .notConfigured; return false }
+        guard registration.isRegistered else { lastError = .notRegistered; return false }
+        guard call == nil else { lastError = .busy; return false }
         guard case .success(let uri) = DialString.sipURI(raw, domain: account.domain) else {
             lastError = .invalidNumber
-            return
+            return false
         }
         do {
             let address = try Factory.Instance.createAddress(addr: uri)
@@ -185,17 +192,24 @@ public final class CallEngine {
             if let preferredIdentity {
                 params.addCustomHeader(headerName: "P-Preferred-Identity", headerValue: preferredIdentity)
             }
+            pendingOutgoingUUID = callKitUUID
             guard let sdkCall = core.inviteAddressWithParams(addr: address, params: params) else {
+                pendingOutgoingUUID = nil
                 lastError = .sdk("invite returned nil")
-                return
+                return false
             }
             self.sdkCall = sdkCall
             lastError = nil
-            Diagnostics.record("sip", "invite \(uri) call-id \(sdkCall.callLog?.callId ?? "?") ppi \(preferredIdentity ?? "-")")
+            Diagnostics.record("sip", "invite \(uri) call-id \(sdkCall.callLog?.callId ?? "?") ppi \(preferredIdentity ?? "-") callkit \(callKitUUID?.uuidString ?? "-")")
+            return true
         } catch {
+            pendingOutgoingUUID = nil
             lastError = .sdk(String(describing: error))
+            return false
         }
     }
+    /// The CallKit uuid of the call being placed, adopted by the first outgoing state (OutgoingInit).
+    @ObservationIgnored private var pendingOutgoingUUID: UUID?
 
     public func accept() {
         guard let sdkCall else { return }
@@ -207,6 +221,21 @@ public final class CallEngine {
         do { try sdkCall.decline(reason: .Declined) } catch { lastError = .sdk(String(describing: error)) }
     }
 
+    /// CallKit refused to show the call (a Focus, an unsupported handle): the caller hears busy rather than ringing
+    /// a phone that shows nothing; the platform's busy handling (forwarding, voicemail) takes over.
+    public func declineBusy() {
+        guard let sdkCall else { return }
+        do { try sdkCall.decline(reason: .Busy) } catch { lastError = .sdk(String(describing: error)) }
+    }
+
+    // MARK: CallKit audio hand-over (S4: called from the provider callbacks only, via CallKitBridge)
+
+    /// Before `accept()` / the invite of a CallKit-started call: the SDK sets up the AVAudioSession with its defaults.
+    public func configureAudioSession() { core?.configureAudioSession() }
+
+    /// `didActivate` / `didDeactivate` of the provider: the SDK starts or stops the audio streams accordingly.
+    public func audioSessionActivated(_ active: Bool) { core?.activateAudioSession(activated: active) }
+
     public func hangUp() {
         guard let sdkCall else { return }
         hungUpLocally = true
@@ -214,10 +243,12 @@ public final class CallEngine {
     }
     @ObservationIgnored private var hungUpLocally = false
 
-    public func toggleMute() {
+    public func toggleMute() { setMuted(!(call?.muted ?? false)) }
+
+    public func setMuted(_ muted: Bool) {
         guard let core, call != nil else { return }
-        core.micEnabled.toggle()
-        call?.muted = !core.micEnabled
+        core.micEnabled = !muted
+        call?.muted = muted
     }
 
     public func toggleSpeaker() {
@@ -237,6 +268,8 @@ public final class CallEngine {
     }
 
     public func clearError() { lastError = nil }
+    /// A second call attempt while one is up (the MVP has no call waiting).
+    public func noteBusy() { lastError = .busy }
 
     // MARK: Delegates
 
@@ -364,7 +397,7 @@ public final class CallEngine {
                 return
             }
             sdkCall = sdk
-            call = ActiveCall(
+            let incoming = ActiveCall(
                 callID: callID,
                 direction: .incoming,
                 remoteNumber: sdk.remoteAddress?.username ?? "unknown",
@@ -373,9 +406,15 @@ public final class CallEngine {
                 sdkState: String(describing: state),
                 startedAt: Date()
             )
+            call = incoming
             capturePlatformCallID(sdk)
-        case .OutgoingInit, .OutgoingProgress:
+            // docs/02 §3: CallKit shows it (lock screen, native answer); nothing else happens with the call first.
+            callKit?.reportIncoming(incoming.uuid, number: incoming.remoteNumber, name: incoming.remoteName)
+        case .OutgoingInit:
             upsertOutgoing(sdk, phase: .dialing, state: state)
+        case .OutgoingProgress:
+            upsertOutgoing(sdk, phase: .dialing, state: state)
+            if let uuid = call?.uuid { callKit?.reportOutgoingStartedConnecting(uuid) }
         case .OutgoingRinging, .OutgoingEarlyMedia:
             upsertOutgoing(sdk, phase: .ringing, state: state)
             capturePlatformCallID(sdk)
@@ -384,6 +423,7 @@ public final class CallEngine {
             call?.phase = .active
             call?.sdkState = String(describing: state)
             capturePlatformCallID(sdk)
+            if let uuid = call?.uuid { callKit?.reportConnected(uuid) }
         case .Paused, .PausedByRemote, .Pausing:
             call?.phase = .held
             call?.sdkState = String(describing: state)
@@ -394,6 +434,7 @@ public final class CallEngine {
             call?.sdkState = String(describing: state)
         case .Released:
             let reason = hungUpLocally ? "ended" : Self.endReason(sdk, message)
+            if let uuid = call?.uuid { callKit?.reportEnded(uuid, cause: Self.endCause(sdk, hungUpLocally: hungUpLocally)) }
             hungUpLocally = false
             call?.phase = .ended(reason: reason)
             sdkCall = nil
@@ -450,6 +491,7 @@ public final class CallEngine {
     private func upsertOutgoing(_ sdk: Call, phase: CallPhase, state: Call.State) {
         if call == nil {
             call = ActiveCall(
+                uuid: pendingOutgoingUUID ?? UUID(),
                 callID: sdk.callLog?.callId ?? "?",
                 direction: .outgoing,
                 remoteNumber: sdk.remoteAddress?.username ?? "unknown",
@@ -458,10 +500,30 @@ public final class CallEngine {
                 sdkState: String(describing: state),
                 startedAt: Date()
             )
+            pendingOutgoingUUID = nil
         } else {
             call?.phase = phase
             call?.sdkState = String(describing: state)
         }
+    }
+
+    /// What CallKit is told at the end (docs/07): the SDK's call log knows about the other device of the user
+    /// (parallel forking: "answered elsewhere" / "declined elsewhere"), a timed-out ring is "unanswered", an
+    /// outgoing call refused by the network (4xx/5xx other than busy or decline) "failed".
+    static func endCause(_ sdk: Call, hungUpLocally: Bool) -> CallEndCause {
+        endCause(status: sdk.callLog?.status, direction: sdk.dir, protocolCode: sdk.errorInfo?.protocolCode ?? 0, hungUpLocally: hungUpLocally)
+    }
+
+    nonisolated static func endCause(status: Call.Status?, direction: Call.Dir, protocolCode: Int, hungUpLocally: Bool) -> CallEndCause {
+        switch status {
+        case .AcceptedElsewhere: return .answeredElsewhere
+        case .DeclinedElsewhere: return .declinedElsewhere
+        case .Missed: return .unanswered
+        default: break
+        }
+        if hungUpLocally { return .remoteEnded }   // our own end action already told CallKit; this is the fallback
+        if direction == .Outgoing, protocolCode >= 400, protocolCode != 486, protocolCode != 603 { return .failed }
+        return .remoteEnded
     }
 
     private static func endReason(_ sdk: Call, _ message: String) -> String {

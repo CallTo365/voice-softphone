@@ -8,6 +8,8 @@ import Observation
 @Observable
 public final class AppSession {
     public let engine: CallEngine
+    /// CallKit on real devices (phase 1, docs/07); nil on the simulator, where the engine is driven directly.
+    public let callKit: CallKitBridge?
     public private(set) var enrollment: DeviceEnrollment?
     public private(set) var callerIDs: CallerIDStore?
     public private(set) var isEnrolling = false
@@ -16,9 +18,17 @@ public final class AppSession {
     @ObservationIgnored private let store: AccountStore
     @ObservationIgnored private var api: PlatformAPI?
 
-    public init(store: AccountStore = AccountStore(), engine: CallEngine? = nil) {
+    public init(store: AccountStore = AccountStore(), engine: CallEngine? = nil, callKit: Bool = CallKitBridge.isSupported) {
         self.store = store
-        self.engine = engine ?? CallEngine(store: store)
+        let engine = engine ?? CallEngine(store: store)
+        self.engine = engine
+        let bridge = callKit ? CallKitBridge(engine: engine) : nil
+        self.callKit = bridge
+        engine.callKit = bridge          // before start(): the Core is created CallKit-aware
+        bridge?.holdHandler = { [weak self] onHold in
+            guard let self else { return false }
+            return await self.holdForCallKit(onHold)
+        }
     }
 
     /// Starts the engine (which restores the SIP account) and restores the enrollment.
@@ -113,10 +123,47 @@ public final class AppSession {
         }
     }
 
+    // MARK: Call intents (through CallKit on devices, straight to the engine on the simulator; docs/07)
+
     /// Dials with the caller-ID choice attached (docs/05 §3).
     public func placeCall(to number: String) {
         let ppi = engine.account.flatMap { callerIDs?.preferredIdentity(domain: $0.domain) }
-        engine.placeCall(to: number, preferredIdentity: ppi)
+        guard engine.call == nil else { engine.noteBusy(); return }
+        if let callKit {
+            callKit.startCall(to: number, displayName: nil, preferredIdentity: ppi)
+        } else {
+            engine.placeCall(to: number, preferredIdentity: ppi)
+        }
+    }
+
+    public func answer() {
+        guard let call = engine.call else { return }
+        if let callKit { callKit.answer(call.uuid) } else { engine.accept() }
+    }
+
+    /// Declines a ringing call or hangs up a live one.
+    public func endCall() {
+        guard let call = engine.call else { return }
+        if let callKit {
+            callKit.end(call.uuid)
+        } else if call.direction == .incoming, call.phase == .incoming || call.phase == .incomingPush {
+            engine.decline()
+        } else {
+            engine.hangUp()
+        }
+    }
+
+    public func toggleMute() {
+        guard let call = engine.call else { return }
+        if let callKit { callKit.setMuted(call.uuid, !call.muted) } else { engine.toggleMute() }
+    }
+
+    /// CallKit asked for a hold (a cellular call answered on top of ours, docs/07 D1): the platform hold, so the
+    /// far end hears music and the switchboard sees it; a plain SDK pause would leave the platform blind (S2).
+    private func holdForCallKit(_ onHold: Bool) async -> Bool {
+        guard let call = engine.call, call.heldByMe != onHold else { return true }
+        await toggleHold()
+        return controlError == nil
     }
 
     private func adopt(_ e: DeviceEnrollment) {

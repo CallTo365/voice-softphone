@@ -1,8 +1,9 @@
 import SwiftUI
 import SoftphoneKit
 
-/// The in-call screen for phase 0 (foreground only). Phase 1 keeps this screen and adds CallKit
-/// behind it; the buttons then go through CallKit actions instead of calling the engine directly.
+/// The in-call screen. On a device every button goes through CallKit (`AppSession` -> `CallKitBridge` ->
+/// `CXTransaction` -> engine), so the native call screen and this one never disagree; on the simulator the
+/// session drives the engine directly (docs/07).
 struct CallView: View {
     @Environment(AppSession.self) private var session
     @Environment(CallEngine.self) private var engine
@@ -37,12 +38,12 @@ struct CallView: View {
             if let call = engine.call, call.phase.isLive {
                 if call.phase == .incoming {
                     HStack(spacing: 64) {
-                        RoundButton(symbol: "phone.down.fill", label: "Decline", tint: .red) { engine.decline() }
-                        RoundButton(symbol: "phone.fill", label: "Accept", tint: .green) { engine.accept() }
+                        RoundButton(symbol: "phone.down.fill", label: "Decline", tint: .red) { session.endCall() }
+                        RoundButton(symbol: "phone.fill", label: "Accept", tint: .green) { session.answer() }
                     }
                 } else {
                     HStack(spacing: 40) {
-                        ToggleButton(symbol: "mic.slash.fill", label: "Mute", isOn: call.muted) { engine.toggleMute() }
+                        ToggleButton(symbol: "mic.slash.fill", label: "Mute", isOn: call.muted) { session.toggleMute() }
                         ToggleButton(symbol: "circle.grid.3x3.fill", label: "Keypad", isOn: showKeypad) { showKeypad.toggle() }
                         ToggleButton(symbol: "speaker.wave.2.fill", label: "Speaker", isOn: call.speakerOn) { engine.toggleSpeaker() }
                     }
@@ -70,7 +71,7 @@ struct CallView: View {
                             .multilineTextAlignment(.center)
                             .onTapGesture { session.clearControlError() }
                     }
-                    RoundButton(symbol: "phone.down.fill", label: "End", tint: .red) { engine.hangUp() }
+                    RoundButton(symbol: "phone.down.fill", label: "End", tint: .red) { session.endCall() }
                 }
             }
             Spacer(minLength: 24)

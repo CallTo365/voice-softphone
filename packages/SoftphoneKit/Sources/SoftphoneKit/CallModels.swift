@@ -44,6 +44,9 @@ public enum CallPhase: Equatable, Sendable {
 
 /// The one call the MVP handles at a time. Call waiting comes later.
 public struct ActiveCall: Equatable, Sendable {
+    /// CallKit's id for this call (phase 1); generated here for inbound calls, given by the `CXStartCallAction`
+    /// for outbound ones. Stable for the life of the call.
+    public var uuid: UUID = UUID()
     /// SIP Call-ID: what support and Homer see.
     public var callID: String
     public var direction: CallDirection

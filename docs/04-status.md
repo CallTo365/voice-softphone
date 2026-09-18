@@ -80,9 +80,21 @@
   1001 dialed `0473981616` from the app and the outbound leg shows `+32473981616`.
 - App side of the same request: long-press 0 → `+` was already in (dae569e). Nothing else changes in the app.
 
+## 2026-09-18 — CallKit phase 1 (docs/07, ADR-0005)
+- `CallKitBridge` (CXProvider + CXCallController) in SoftphoneKit; the engine runs `callkitEnabled` on devices,
+  reports every call to CallKit and takes the audio-session hand-over from the provider callbacks (S4); the
+  session routes start/answer/end/mute through CXTransactions; CallKit hold = platform hold; refused reports
+  decline busy; Recents callback via `INStartCallIntent`; simulator keeps the direct path (S14). 30 tests.
+- Device build signed with the owner's team from the command line (`configs/Signing.local.xcconfig`, git-ignored)
+  and installed on iPhone H with `devicectl`. **Verified by the owner 10:33Z:** a platform originate to 1001
+  (`POST /v1/tenants/{t}/calls`, to `*98`) rang the native CallKit screen, was answered there, two-way audio;
+  the platform's record shows answered at 10:32:47Z, NORMAL_CLEARING. First attempt went NO_ANSWER (app freshly
+  launched from the Mac, in the background). Outgoing through CallKit: owner's check pending.
+- Simulator regression: `*98` from the iPhone 15 simulator still places and ends a call on the direct path.
+
 ## Open threads
 - 1001 <-> 1002 with Bria on a real phone and the owner's ear test remain as human checks.
-- Next block: phase 1 (CallKit; needs the Team ID for a device build) or P3/P4 push (needs the APNs `.p8`).
+- Next block: P3/P4 push (needs the APNs `.p8`; the Team ID 447LH394HW is in the git-ignored Signing.local.xcconfig now).
 - Kamailio dead-branch handling (P3): `remove_branch` vs `event_route[tcp:closed]` + `ul.rm`, to be
   decided in the platform build pass with a SIPp/real-phone test.
 - Password field: phase 3 replaces it with enrollment; until then the dev screen is the only way in.
