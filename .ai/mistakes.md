@@ -37,6 +37,12 @@ The **Log** is append-only.
 - R11. A platform branch counts as deployed only when `git merge-base --is-ancestor <sha> main` says so on the
   owner's checkout (and `.deployed-rev` on the VM matches); a behaviour that "worked" on the next test is not
   proof the branch went out — inbound calls carried the call id before the branch existed.
+- R12. Every closure handed to the SDK or to a system API that may call back off the main thread (linphonesw
+  delegate stubs, `NWPathMonitor`, `AVCaptureDevice.requestAccess`, `URLSession` callbacks, timers) is written
+  `{ @Sendable … in }` and hops to the main actor itself (`Task { @MainActor … }`, or `assumeIsolated` only where
+  the callback is known to be on the main thread). A plain closure created inside a `@MainActor` context inherits
+  main-actor isolation and the Swift 6 runtime on iOS 26 asserts it at entry — a crash the iOS 17 simulator never
+  shows. Verify device-facing changes on an iOS 26 simulator (iPhone 17 Pro, runtime 26.5) before handing over.
 - R7. The liblinphone Core is created with `configPath: nil`. A config file persists accounts, auth info
   (password/ha1) and `verify_server_certs` in plain text and restores them at the next launch; the
   Keychain is the only credential store and `start()` re-applies everything.
@@ -139,3 +145,16 @@ Template (copy, fill, append at the end):
 - **Impact:** one wasted test round for the owner; the hold-music branch was built on a main without the stamp.
 - **Fix:** rebased and re-merged (d896c5b); rule R11.
 - **Rule:** R11.
+
+### 2026-09-18 — device build froze / crashed: main-actor-inferred closure called from the SDK's DNS thread
+- **What happened:** the app on the owner's iPhone (iOS 26.6.1) stuck on "Registering…" and stopped responding; the
+  Xcode pause showed `_dispatch_assert_queue_fail` ← `_swift_task_checkIsolatedSwift` ← closure #1 in
+  `CallEngine.installSDKLogging()`, invoked from `dns_service_query_record_cb` on the SDK's resolver thread.
+- **Root cause:** the log-delegate closure was written inside a `@MainActor` method; Swift 6 infers main-actor
+  isolation for it and the iOS 26 runtime enforces the assumption on entry. The iOS 17.5 simulator runtime does not,
+  so two days of simulator testing never showed it. Same pattern in the Core delegate, the path monitor and the
+  camera-permission callback.
+- **Impact:** the app was unusable on a real phone; a day of "registration" debugging looked at the network first.
+- **Fix:** all such closures `@Sendable`; reachability callback hops via `Task { @MainActor }` when off-main;
+  verified on the iPhone 17 Pro / iOS 26.5 simulator against a bogus host (the same DNS callback, no assertion).
+- **Rule:** R12.

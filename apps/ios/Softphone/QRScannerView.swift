@@ -1,4 +1,4 @@
-import AVFoundation
+@preconcurrency import AVFoundation
 import SwiftUI
 import UIKit
 
@@ -79,7 +79,7 @@ final class ScannerController: UIViewController {
         view.layer.addSublayer(layer)
         preview = layer
         let capture = self.capture
-        AVCaptureDevice.requestAccess(for: .video) { granted in
+        AVCaptureDevice.requestAccess(for: .video) { @Sendable granted in   // arbitrary queue (R12)
             if granted { capture.start() }
         }
     }

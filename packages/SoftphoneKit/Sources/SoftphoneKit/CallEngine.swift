@@ -241,20 +241,29 @@ public final class CallEngine {
     // MARK: Delegates
 
     private func installCoreDelegate(_ core: Core) {
+        // Every closure the SDK calls is @Sendable on purpose: a plain closure written inside this @MainActor method
+        // would be inferred main-actor-isolated and the Swift 6 runtime asserts that at entry — the SDK invokes
+        // some callbacks from its own threads (DNS, media), which crashed the app on iOS 26 (2026-09-18, R12).
+        // Core callbacks are delivered from iterate() on the main thread (auto-iterate), hence assumeIsolated;
+        // the reachability callback may come from the SDK's monitor thread, so it hops instead.
         let delegate = CoreDelegateStub(
-            onCallStateChanged: { _, call, state, message in
+            onCallStateChanged: { @Sendable _, call, state, message in
                 MainActor.assumeIsolated { CallEngine.current?.callStateChanged(call, state, message) }
             },
-            onCallStatsUpdated: { _, call, stats in
+            onCallStatsUpdated: { @Sendable _, call, stats in
                 MainActor.assumeIsolated { CallEngine.current?.statsUpdated(call, stats) }
             },
-            onNetworkReachable: { _, reachable in
-                MainActor.assumeIsolated { CallEngine.current?.sdkReachabilityChanged(reachable) }
+            onNetworkReachable: { @Sendable _, reachable in
+                if Thread.isMainThread {
+                    MainActor.assumeIsolated { CallEngine.current?.sdkReachabilityChanged(reachable) }
+                } else {
+                    Task { @MainActor in CallEngine.current?.sdkReachabilityChanged(reachable) }
+                }
             },
-            onAudioDevicesListUpdated: { core in
+            onAudioDevicesListUpdated: { @Sendable core in
                 MainActor.assumeIsolated { CallEngine.current?.refreshAudioDevices(core) }
             },
-            onAccountRegistrationStateChanged: { _, _, state, message in
+            onAccountRegistrationStateChanged: { @Sendable _, _, state, message in
                 MainActor.assumeIsolated { CallEngine.current?.registrationChanged(state, message) }
             }
         )
@@ -286,7 +295,7 @@ public final class CallEngine {
     /// host as unreachable while iOS has a perfectly good route, and it then never sends the REGISTER. When iOS says
     /// the path is satisfied and the SDK still says no after a few seconds, the SDK is told otherwise (logged).
     private func startPathMonitor() {
-        pathMonitor.pathUpdateHandler = { path in
+        pathMonitor.pathUpdateHandler = { @Sendable path in   // called on the monitor's queue (R12)
             let ok = path.status == .satisfied
             let ifaces = path.availableInterfaces.map { "\($0.name)/\($0.type)" }.joined(separator: ",")
             Task { @MainActor in CallEngine.current?.pathChanged(ok, ifaces) }
@@ -493,7 +502,8 @@ public final class CallEngine {
         #else
         service.logLevel = .Warning
         #endif
-        let delegate = LoggingServiceDelegateStub(onLogMessageWritten: { _, _, level, message in
+        // Called from any SDK thread: @Sendable, nothing main-actor inside (R12).
+        let delegate = LoggingServiceDelegateStub(onLogMessageWritten: { @Sendable _, _, level, message in
             let mapped: Diagnostics.SDKLogLevel
             if level.contains(.Error) || level.contains(.Fatal) { mapped = .error }
             else if level.contains(.Warning) { mapped = .warning }
