@@ -6,6 +6,7 @@ struct DialerView: View {
     @Environment(CallEngine.self) private var engine
     @State private var number = ""
     @State private var showCallerIDs = false
+    @State private var showDiagnostics = false
 
     private let keys: [[String]] = [["1", "2", "3"], ["4", "5", "6"], ["7", "8", "9"], ["*", "0", "#"]]
 
@@ -70,6 +71,7 @@ struct DialerView: View {
             }
             .padding(.top)
             .navigationTitle(engine.account?.username ?? "CallTo")
+            .sheet(isPresented: $showDiagnostics) { DiagnosticsView() }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
@@ -78,6 +80,7 @@ struct DialerView: View {
                         }
                         Text("liblinphone \(engine.sdkVersion)")
                         Text("instance \(engine.instanceID.prefix(8))…")
+                        Button("Diagnostics") { showDiagnostics = true }
                         Button("Sign out", role: .destructive) { session.signOut() }
                     } label: {
                         Image(systemName: "gearshape")

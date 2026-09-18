@@ -1,4 +1,5 @@
 import Foundation
+import Network
 import Observation
 @preconcurrency import linphonesw
 
@@ -20,6 +21,9 @@ public final class CallEngine {
     public private(set) var instanceID: String = ""
     /// Last engine-level problem worth showing (registration is reported through `registration`).
     public private(set) var lastError: SoftphoneError?
+    /// What the SDK believes about the network; iOS' own view is in `pathSatisfied`. They disagree on VPNs.
+    public private(set) var sdkReachable = true
+    public private(set) var pathSatisfied = true
 
     // MARK: Private
 
@@ -35,6 +39,8 @@ public final class CallEngine {
     @ObservationIgnored private var sdkCall: Call?
     @ObservationIgnored private var speakerDevice: AudioDevice?
     @ObservationIgnored private var earpieceDevice: AudioDevice?
+    @ObservationIgnored private let pathMonitor = NWPathMonitor()
+    @ObservationIgnored private var reachabilityTask: Task<Void, Never>?
 
     public init(store: AccountStore = AccountStore()) {
         self.store = store
@@ -77,7 +83,8 @@ public final class CallEngine {
             installCoreDelegate(core)
             try core.start()
             refreshAudioDevices(core)
-            Diagnostics.sip.info("core started, liblinphone \(self.sdkVersion, privacy: .public), instance \(self.instanceID, privacy: .public)")
+            startPathMonitor()
+            Diagnostics.record("sip", "core started, liblinphone \(sdkVersion), instance \(instanceID)")
         } catch {
             Diagnostics.sip.error("core start failed: \(String(describing: error), privacy: .public)")
             lastError = .sdk(String(describing: error))
@@ -139,7 +146,7 @@ public final class CallEngine {
             core.defaultAccount = sdkAccount
             self.sdkAccount = sdkAccount
             registration = .registering
-            Diagnostics.sip.info("account configured: \(account.identity, privacy: .public) via \(account.serverURI, privacy: .public)")
+            Diagnostics.record("sip", "account configured: \(account.identity) via \(account.serverURI) (sdk reachable: \(core.isNetworkReachable))")
         } catch {
             Diagnostics.sip.error("account configure failed: \(String(describing: error), privacy: .public)")
             registration = .failed(String(describing: error))
@@ -184,7 +191,7 @@ public final class CallEngine {
             }
             self.sdkCall = sdkCall
             lastError = nil
-            Diagnostics.sip.info("invite \(uri, privacy: .public) call-id \(sdkCall.callLog?.callId ?? "?", privacy: .public) ppi \(preferredIdentity ?? "-", privacy: .public)")
+            Diagnostics.record("sip", "invite \(uri) call-id \(sdkCall.callLog?.callId ?? "?") ppi \(preferredIdentity ?? "-")")
         } catch {
             lastError = .sdk(String(describing: error))
         }
@@ -241,6 +248,9 @@ public final class CallEngine {
             onCallStatsUpdated: { _, call, stats in
                 MainActor.assumeIsolated { CallEngine.current?.statsUpdated(call, stats) }
             },
+            onNetworkReachable: { _, reachable in
+                MainActor.assumeIsolated { CallEngine.current?.sdkReachabilityChanged(reachable) }
+            },
             onAudioDevicesListUpdated: { core in
                 MainActor.assumeIsolated { CallEngine.current?.refreshAudioDevices(core) }
             },
@@ -267,7 +277,44 @@ public final class CallEngine {
             stopRetryingAfterAuthFailure()
         case .None: registration = account == nil ? .unconfigured : .cleared
         }
-        Diagnostics.sip.info("registration \(String(describing: state), privacy: .public): \(message, privacy: .public)")
+        Diagnostics.record("sip", "registration \(String(describing: state)): \(message)")
+    }
+
+    // MARK: Reachability
+
+    /// liblinphone runs its own reachability monitor; on VPNs (utun interfaces) it has been seen to report the SIP
+    /// host as unreachable while iOS has a perfectly good route, and it then never sends the REGISTER. When iOS says
+    /// the path is satisfied and the SDK still says no after a few seconds, the SDK is told otherwise (logged).
+    private func startPathMonitor() {
+        pathMonitor.pathUpdateHandler = { path in
+            let ok = path.status == .satisfied
+            let ifaces = path.availableInterfaces.map { "\($0.name)/\($0.type)" }.joined(separator: ",")
+            Task { @MainActor in CallEngine.current?.pathChanged(ok, ifaces) }
+        }
+        pathMonitor.start(queue: DispatchQueue(label: "com.callto365.softphone.path"))
+    }
+
+    private func pathChanged(_ satisfied: Bool, _ interfaces: String) {
+        pathSatisfied = satisfied
+        Diagnostics.record("sip", "ios path \(satisfied ? "satisfied" : "unsatisfied") [\(interfaces)], sdk reachable: \(core?.isNetworkReachable ?? false)")
+        reconcileReachability()
+    }
+
+    private func sdkReachabilityChanged(_ reachable: Bool) {
+        sdkReachable = reachable
+        Diagnostics.record("sip", "sdk network reachable: \(reachable) (ios path satisfied: \(pathSatisfied))", level: reachable ? .info : .default)
+        reconcileReachability()
+    }
+
+    private func reconcileReachability() {
+        reachabilityTask?.cancel()
+        guard pathSatisfied, let core, !core.isNetworkReachable else { return }
+        reachabilityTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(3))
+            guard let self, !Task.isCancelled, self.pathSatisfied, let core = self.core, !core.isNetworkReachable else { return }
+            Diagnostics.record("sip", "sdk still says unreachable while iOS has a route: forcing network reachable (VPN?)", level: .default)
+            core.networkReachable = true
+        }
     }
 
     /// A wrong credential must not be retried: liblinphone re-sends the same digest until the edge
@@ -298,7 +345,7 @@ public final class CallEngine {
 
     private func callStateChanged(_ sdk: Call, _ state: Call.State, _ message: String) {
         let callID = sdk.callLog?.callId ?? "?"
-        Diagnostics.sip.info("call \(callID, privacy: .public) -> \(String(describing: state), privacy: .public) \(message, privacy: .public)")
+        Diagnostics.record("sip", "call \(callID) -> \(String(describing: state)) \(message)")
 
         switch state {
         case .IncomingReceived, .PushIncomingReceived:
@@ -383,7 +430,7 @@ public final class CallEngine {
         let v = sdk.remoteParams?.getCustomHeader(headerName: "X-Call-ID-Platform").trimmingCharacters(in: .whitespaces) ?? ""
         if !v.isEmpty {
             call?.platformCallID = v
-            Diagnostics.sip.info("platform call id \(v, privacy: .public)")
+            Diagnostics.record("sip", "platform call id \(v)")
         }
     }
 

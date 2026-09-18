@@ -175,11 +175,11 @@ public struct PlatformAPI: Sendable {
         do {
             (data, response) = try await session.data(for: req)
         } catch {
-            Diagnostics.api.error("\(method, privacy: .public) \(path, privacy: .public): \(error.localizedDescription, privacy: .public)")
+            Diagnostics.record("api", "\(method) \(path): \(error.localizedDescription)", level: .error)
             throw Failure(status: 0, code: "network", message: error.localizedDescription)
         }
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-        Diagnostics.api.info("\(method, privacy: .public) \(path, privacy: .public) -> \(status, privacy: .public)")
+        Diagnostics.record("api", "\(method) \(path) -> \(status)")
         guard (200..<300).contains(status) else {
             if let env = try? JSONDecoder().decode(ErrorEnvelope.self, from: data) {
                 throw Failure(status: status, code: env.error.code, message: env.error.message)
