@@ -36,7 +36,10 @@ struct DialerView: View {
                     .sheet(isPresented: $showCallerIDs) { CallerIDSheet(store: store) }
                 }
 
-                Keypad(keys: keys) { key in number.append(key) }
+                Keypad(keys: keys, onLongPress: { key in
+                    // as on the iPhone keypad: holding 0 gives +, only as the first character
+                    if key == "0", number.isEmpty { number = "+" }
+                }) { key in number.append(key) }
 
                 HStack(spacing: 40) {
                     Button {
@@ -117,6 +120,7 @@ struct RegistrationBadge: View {
 
 struct Keypad: View {
     let keys: [[String]]
+    var onLongPress: ((String) -> Void)? = nil
     let onKey: (String) -> Void
 
     var body: some View {
@@ -124,16 +128,33 @@ struct Keypad: View {
             ForEach(keys, id: \.self) { row in
                 HStack(spacing: 24) {
                     ForEach(row, id: \.self) { key in
-                        Button { onKey(key) } label: {
-                            Text(key)
-                                .font(.system(size: 30, weight: .regular, design: .rounded))
-                                .frame(width: 72, height: 72)
-                                .background(Color(.secondarySystemBackground), in: Circle())
-                        }
-                        .buttonStyle(.plain)
+                        KeypadKey(key: key, onTap: { onKey(key) }, onLongPress: onLongPress.map { h in { h(key) } })
                     }
                 }
             }
         }
+    }
+}
+
+/// One key: tap = digit, long press (0 -> +) when the keypad offers it; the "+" hint sits under the 0 like iOS.
+private struct KeypadKey: View {
+    let key: String
+    let onTap: () -> Void
+    let onLongPress: (() -> Void)?
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Text(key)
+                .font(.system(size: 30, weight: .regular, design: .rounded))
+            if key == "0", onLongPress != nil {
+                Text("+").font(.caption2).foregroundStyle(.secondary)
+            }
+        }
+        .frame(width: 72, height: 72)
+        .background(Color(.secondarySystemBackground), in: Circle())
+        .contentShape(Circle())
+        .onTapGesture { onTap() }
+        .onLongPressGesture(minimumDuration: 0.4) { onLongPress?() }
+        .accessibilityLabel(key == "0" && onLongPress != nil ? "0, hold for plus" : key)
     }
 }
