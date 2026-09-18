@@ -157,7 +157,7 @@ ingress". Check that Kamailio strips `P-Preferred-Identity`/`P-Asserted-Identity
 ingress (carriers, tenant trunks, agent gateway) before honouring the header anywhere. ADR in the
 platform repo.
 
-## P9. Dialing context: national numbers per user/tenant country — built 2026-09-18, platform branch `softphone/dialing-context` (e27e8f4), platform docs/40 + ADR-0059, migration 0060
+## P9. Dialing context: national numbers per user/tenant country — built 2026-09-18 (platform docs/40 + ADR-0059, migration 0060), merged as platform main 3a99f5b, on the VM and owner-verified the same day
 
 The app sends what the user typed (`DialString` only turns `00` into `+` and passes national forms through;
 long-press 0 gives `+`); the platform reads the digits in the caller's dialing country: `users.country`

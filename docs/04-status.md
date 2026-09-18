@@ -75,8 +75,9 @@
   string as E.164 without `+`. Proposal docs/40 + ADR-0059 in the platform repo approved ("go with the
   recommendations"), built on `softphone/dialing-context` (e27e8f4, rebased on main f892ab4, pushed): per-country
   table in code, effective country user → tenant → none, Entra `usageLocation` sync rule, user sheet picker,
-  `unparseable_destination` rejection. Deploy pending (migration 0060 + control-plane ×3 + directory + admin-ui);
-  VM check: 1001 dials `0634443999` on the NL tenant → CDR `to_number=+31634443999`.
+  `unparseable_destination` rejection. Merged as platform main 3a99f5b and on the VM 2026-09-18 09:41Z (migration
+  0060, control-plane ×3, admin-ui; `directory` 09:45Z). **Owner-verified ~10:00Z:** the acme tenant is `country = BE`,
+  1001 dialed `0473981616` from the app and the outbound leg shows `+32473981616`.
 - App side of the same request: long-press 0 → `+` was already in (dae569e). Nothing else changes in the app.
 
 ## Open threads
